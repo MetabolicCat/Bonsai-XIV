@@ -27,9 +27,12 @@ keep = 1                           # how many per group
 |---|---|---|
 | `name` | required | shown in the results |
 | `where` | `"true"` | an expression: the recipes for which it is true are candidates |
-| `group` | `[]` | expressions: candidates with the same values compete together |
+| `group` | `[]` | expressions, or one alone: candidates with the same values compete together |
 | `score` | `"0"` | an expression: the candidates with the highest scores are kept |
 | `keep` | all | how many candidates each group keeps |
+
+`[[rule]]` and `[parameters]` are the only tables; an unknown key or
+name is an error, reported with the rule.
 | `enabled` | `true` | `false` skips the rule |
 
 A candidate whose score is unknown ranks after the others. Ties keep
