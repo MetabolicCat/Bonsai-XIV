@@ -41,12 +41,12 @@ For special shops, Teamcraft's trades are used instead of the
 `SpecialShop` sheet where it has them (see below); the sheet covers the
 shops Teamcraft lacks. In those, some costs are indexes into currency
 sheets that changed meaning from patch to patch (which tomestone is
-"the current one"). Since vendors all charge the same price for an
-item, such a cost takes the price of the item's other trades for the
-same amount, when they all agree; otherwise it is recorded as an
-unknown currency, to be filled in by hand where it matters: see
-[overrides.md](overrides.md). On today's data, no recipe ingredient is
-left with an unknown currency.
+"the current one"). A vendor price is unique per currency, though it
+differs from one currency to another: such a cost is resolved to the
+one price, among the item's other trades for the same amount, that has
+the trade's known costs and the amounts of its unknown ones. When there
+is not exactly one, it is recorded as an unknown currency, to be filled
+in by hand where it matters: see [overrides.md](overrides.md).
 
 ## Other sources: Teamcraft
 

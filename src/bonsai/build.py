@@ -93,6 +93,9 @@ GIL = 1
 # patch, not an item: it is recorded as an unknown currency.
 CURRENCY_INDEXES = 10
 
+# The costs of a trade, sorted.
+Costs = tuple[tuple[int | None, int], ...]
+
 # Every kind of source.
 KINDS = {
     "gathering",
@@ -343,11 +346,14 @@ def _add_source(
 
 
 def _resolve_unknown_costs(db: sqlite3.Connection) -> None:
-    """Give a trade with an unknown currency the price the item has elsewhere.
+    """Resolve an unknown currency from the item's other trades.
 
-    Vendors charge the same price for an item, so the item's other
-    trades for the same amount, with every cost known, give the price.
-    When they disagree, the currency stays unknown.
+    Vendors charge one price for an item in a given currency, though it
+    differs from one currency to another: the item's other trades for
+    the same amount, with every cost known, give its prices. When
+    exactly one of them matches the trade's known costs and its unknown
+    costs' amounts, it is the trade's price; otherwise the currency
+    stays unknown.
     """
     trades: dict[int, tuple[int, int, list[tuple[int | None, int]]]] = {}
     for source, item, amount, cost_item, cost_amount in db.execute(
@@ -357,21 +363,38 @@ def _resolve_unknown_costs(db: sqlite3.Connection) -> None:
         trades.setdefault(source, (item, amount, []))[2].append(
             (cost_item, cost_amount)
         )
-    prices: dict[tuple[int, int], set[tuple[tuple[int | None, int], ...]]] = {}
+    prices: dict[tuple[int, int], set[Costs]] = {}
     for item, amount, costs in trades.values():
         if all(cost_item is not None for cost_item, _ in costs):
             prices.setdefault((item, amount), set()).add(tuple(sorted(costs)))
     for source, (item, amount, costs) in trades.items():
-        known = prices.get((item, amount), set())
-        if any(cost_item is None for cost_item, _ in costs) and len(known) == 1:
+        if all(cost_item is not None for cost_item, _ in costs):
+            continue
+        matching = [
+            price
+            for price in prices.get((item, amount), set())
+            if _matches(costs, price)
+        ]
+        if len(matching) == 1:
             db.execute("DELETE FROM cost WHERE source_id = ?", (source,))
             db.executemany(
                 "INSERT INTO cost VALUES (?, ?, ?)",
                 (
                     (source, cost_item, cost_amount)
-                    for cost_item, cost_amount in next(iter(known))
+                    for cost_item, cost_amount in matching[0]
                 ),
             )
+
+
+def _matches(costs: list[tuple[int | None, int]], price: Costs) -> bool:
+    """Whether `price` has `costs`' known costs, and its unknown costs' amounts."""
+    rest = list(price)
+    for cost in (cost for cost in costs if cost[0] is not None):
+        if cost not in rest:
+            return False
+        rest.remove(cost)
+    unknown = sorted(amount for cost_item, amount in costs if cost_item is None)
+    return unknown == sorted(amount for _, amount in rest)
 
 
 def _apply(db: sqlite3.Connection, corrections: dict[Key, Overrides]) -> None:

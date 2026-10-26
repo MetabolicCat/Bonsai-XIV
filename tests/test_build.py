@@ -385,3 +385,18 @@ def test_an_unknown_currency_stays_unknown_when_other_prices_disagree(
     db = built(upstream, cache)
 
     assert (27737, "special_shop", 1770417, 1, ((None, 5),)) in sources(db)
+
+
+def test_an_unknown_currency_is_the_one_whose_price_matches(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.sheets["Item"] = named(27737, 28, 33913)
+    upstream.sheets["SpecialShop"] = [
+        shop(1770417, 27737, 1, 5),
+        shop(1770053, 27737, 28, 5),
+        shop(1770054, 27737, 33913, 50),
+    ]
+
+    db = built(upstream, cache)
+
+    assert (27737, "special_shop", 1770417, 1, ((28, 5),)) in sources(db)
