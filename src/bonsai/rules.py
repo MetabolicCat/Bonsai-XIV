@@ -103,6 +103,12 @@ def select(
     return selected
 
 
+def rule(entry: Mapping[str, Any], parameters: Mapping[str, Any]) -> Rule:
+    """A rule from the keys of a `[[rule]]` table, checked like a file's."""
+    known = set(Primitives.NAMES) | parameters.keys() | DEFAULT_PARAMETERS.keys()
+    return _rule("rule", 1, dict(entry), known)
+
+
 def _rule(origin: str, number: int, entry: dict[str, Any], known: set[str]) -> Rule:
     if "name" not in entry:
         raise ValueError(f"{origin} {number}: missing name")

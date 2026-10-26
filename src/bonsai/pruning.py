@@ -32,6 +32,7 @@ class Pruning:
     selections: dict[str, list[Selection]]
     kept: dict[int, Kept]
     hoard: dict[int, Hoarded]
+    parameters: dict[str, Any] = field(default_factory=dict)
 
     @property
     def pruned(self) -> list[int]:
@@ -66,4 +67,4 @@ def prune(tree: Tree, rules: Rules) -> Pruning:
                 kept[made_by.id] = Kept(made_by.id)
                 pending.append(made_by.id)
             kept[made_by.id].needed_by.add(recipe)
-    return Pruning(values, selections, kept, hoard)
+    return Pruning(values, selections, kept, hoard, primitives.parameters)

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import httpx
 
-from bonsai import overrides
+from bonsai import overrides, report
 from bonsai.build import build
 from bonsai.cache import Cache
 from bonsai.pruning import prune
@@ -139,41 +139,26 @@ def _prune(cache: Cache, rules_file: Path, show: str | None) -> None:
         raise RuntimeError("no tree: run `bonsai refresh game` first")
     tree = Tree.load(cache.database)
     pruning = prune(tree, Rules.load(rules_file))
-    width = max((len(name) for name in pruning.selections), default=0)
-    for name, selected in pruning.selections.items():
-        print(f"{name:<{width}}  {len(selected)} selected")
+    totals = report.summary(tree, pruning)
+    width = max((len(name) for name in totals["rules"]), default=0)
+    for name, count in totals["rules"].items():
+        print(f"{name:<{width}}  {count} selected")
     print(
-        f"kept {len(pruning.kept)} recipes of {len(tree.recipes)},"
-        f" pruned {len(pruning.pruned)}; {len(pruning.hoard)} base ingredients to hoard"
+        f"kept {totals['kept']} recipes of {totals['recipes']},"
+        f" pruned {totals['pruned']}; {totals['hoard']} base ingredients to hoard"
     )
-
-    def made(recipe: int) -> str:
-        return tree.items[tree.recipes[recipe].item_id].name
-
-    rows: list[tuple[str, str, str]] = []
     if show == "hoard":
-        for hoarded in sorted(
-            pruning.hoard.values(),
-            key=lambda h: (-len(h.needed_by), tree.items[h.item_id].name),
-        ):
-            rows.append(
-                (
-                    tree.items[hoarded.item_id].name,
-                    f"needed by {len(hoarded.needed_by)}",
-                    ", ".join(sorted(hoarded.kinds)) or "no known source",
-                )
-            )
+        rows = [
+            (row["name"], f"needed by {row['needed by']}", row["sources"])
+            for row in report.hoard(tree, pruning)
+        ]
     elif show == "kept":
-        for kept in sorted(
-            pruning.kept.values(),
-            key=lambda k: (not k.rules, -tree.recipes[k.recipe_id].level, k.recipe_id),
-        ):
-            recipe = tree.recipes[kept.recipe_id]
-            reasons = [f"{rule} #{selection.rank}" for rule, selection in kept.rules]
-            reasons += [f"for {made(r)}" for r in sorted(kept.needed_by)]
-            rows.append(
-                (made(recipe.id), f"{recipe.job} {recipe.level}", ", ".join(reasons))
-            )
+        rows = [
+            (row["name"], f"{row['job']} {row['level']}", row["why"])
+            for row in report.kept(tree, pruning)
+        ]
+    else:
+        rows = []
     widths = [max((len(row[i]) for row in rows), default=0) for i in range(2)]
     for first, second, third in rows:
         print(f"{first:<{widths[0]}}  {second:<{widths[1]}}  {third}")
