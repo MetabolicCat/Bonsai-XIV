@@ -10,6 +10,7 @@ from pathlib import Path
 
 import httpx
 
+from bonsai import overrides
 from bonsai.build import build
 from bonsai.cache import Cache
 from bonsai.refresh import refresh_game, refresh_market
@@ -34,9 +35,9 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
                     count = refresh_market(http, cache, args.scope, _show_progress)
                     print(file=sys.stderr)
                     print(f"priced {count} items in {args.scope}")
-        build(cache)
+        build(cache, _override_files())
         return 0
-    except (RuntimeError, httpx.HTTPError) as error:
+    except (RuntimeError, ValueError, httpx.HTTPError) as error:
         print(f"bonsai: {error}", file=sys.stderr)
         return 1
 
@@ -71,8 +72,21 @@ def _parser() -> argparse.ArgumentParser:
 
 
 def _default_cache_dir() -> Path:
-    xdg = os.environ.get("XDG_CACHE_HOME")
-    return (Path(xdg) if xdg else Path.home() / ".cache") / "bonsai-xiv"
+    return _xdg("XDG_CACHE_HOME", ".cache") / "bonsai-xiv"
+
+
+def _override_files() -> list[Path]:
+    """The shared overrides, then the personal ones: those that exist."""
+    files = [
+        Path("overrides.toml"),
+        _xdg("XDG_CONFIG_HOME", ".config") / "bonsai-xiv" / "overrides.toml",
+    ]
+    return [path for path in files if path.exists()]
+
+
+def _xdg(variable: str, default: str) -> Path:
+    directory = os.environ.get(variable)
+    return Path(directory) if directory else Path.home() / default
 
 
 def _client() -> httpx.Client:
@@ -91,6 +105,7 @@ def _status(cache: Cache) -> None:
         print(f"{source:<12} {cache.version(source) or 'not fetched'}")
     print(f"{universalis.NAME:<12} {_market_status(cache)}")
     print(f"{'tree':<12} {_tree_status(cache)}")
+    print(f"{'overrides':<12} {_overrides_status()}")
 
 
 def _market_status(cache: Cache) -> str:
@@ -99,6 +114,14 @@ def _market_status(cache: Cache) -> str:
         return "not fetched"
     meta = universalis.meta(cache.directory(universalis.NAME, market))
     return f"{meta['market_scope']}, fetched at {meta['market_fetched_at']}"
+
+
+def _overrides_status() -> str:
+    files = []
+    for path in _override_files():
+        count = len(overrides.entries(path))
+        files.append(f"{path} ({count} source{'s' if count != 1 else ''})")
+    return ", ".join(files) or "none"
 
 
 def _tree_status(cache: Cache) -> str:

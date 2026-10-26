@@ -1,10 +1,12 @@
 """Building the tree from the cached sources: see docs/tree.md."""
 
 import sqlite3
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from pathlib import Path
 
 from bonsai.cache import Cache
+from bonsai.overrides import Key, Overrides
+from bonsai.overrides import load as load_overrides
 from bonsai.sources import datamining, teamcraft, universalis
 
 SCHEMA = """
@@ -91,17 +93,49 @@ GIL = 1
 # patch, not an item: it is recorded as an unknown currency.
 CURRENCY_INDEXES = 10
 
+# Every kind of source.
+KINDS = {
+    "gathering",
+    "fishing",
+    "gil_shop",
+    "special_shop",
+    "trade",
+    *(kind for kind, _ in teamcraft.KINDS.values()),
+}
+
 # Teamcraft's name for the shops of the SpecialShop sheet.
 SPECIAL_SHOP = "SpecialShop"
 
 
-def build(cache: Cache) -> None:
-    """Write the tree to `cache.database`, from the cache only."""
+def build(cache: Cache, overrides: Sequence[Path] = ()) -> None:
+    """Write the tree to `cache.database`, from the cache and `overrides`.
+
+    `overrides` are files of corrections to the sources, a later one
+    winning over an earlier one. When the build fails, the previous tree
+    stays.
+    """
     sheets = _current(cache, datamining.NAME)
     extracts = _current(cache, teamcraft.NAME)
+    corrections = load_overrides(overrides, KINDS)
 
-    cache.database.unlink(missing_ok=True)
-    with sqlite3.connect(cache.database) as db:
+    partial = cache.database.with_suffix(".partial")
+    partial.unlink(missing_ok=True)
+    try:
+        _build(cache, sheets, extracts, corrections, partial)
+    except BaseException:
+        partial.unlink(missing_ok=True)
+        raise
+    partial.replace(cache.database)
+
+
+def _build(
+    cache: Cache,
+    sheets: Path,
+    extracts: Path,
+    corrections: dict[Key, Overrides],
+    database: Path,
+) -> None:
+    with sqlite3.connect(database) as db:
         db.executescript(SCHEMA)
         _items(db, sheets)
         _recipes(db, sheets)
@@ -117,6 +151,7 @@ def build(cache: Cache) -> None:
             " WHERE item_id NOT IN (SELECT id FROM item))"
         )
         db.execute("DELETE FROM source WHERE item_id NOT IN (SELECT id FROM item)")
+        _apply(db, corrections)
         meta = {
             "datamining_version": sheets.name,
             "teamcraft_version": extracts.name,
@@ -304,3 +339,21 @@ def _add_source(
         "INSERT INTO cost VALUES (?, ?, ?)",
         ((source, cost_item, cost_amount) for cost_item, cost_amount in costs or []),
     )
+
+
+def _apply(db: sqlite3.Connection, corrections: dict[Key, Overrides]) -> None:
+    """Replace the sources of each item, kind and ref that is overridden."""
+    items = {item for (item,) in db.execute("SELECT id FROM item")}
+    for key, (path, entries) in corrections.items():
+        for entry in entries:
+            for item in [entry.item, *(cost for cost, _ in entry.costs)]:
+                if item not in items:
+                    raise ValueError(f"{path}: unknown item {item}")
+        matching = "SELECT id FROM source WHERE item_id = ? AND kind = ? AND ref IS ?"
+        db.execute(f"DELETE FROM cost WHERE source_id IN ({matching})", key)
+        db.execute(f"DELETE FROM source WHERE id IN ({matching})", key)
+        for entry in entries:
+            if not entry.remove:
+                _add_source(
+                    db, entry.item, entry.kind, entry.ref, entry.amount, entry.costs
+                )

@@ -41,7 +41,8 @@ For special shops, Teamcraft's trades are used instead of the
 `SpecialShop` sheet where it has them (see below); the sheet covers the
 shops Teamcraft lacks. In those, some costs are indexes into currency
 sheets that changed meaning from patch to patch (which tomestone is
-"the current one"); they are recorded as an unknown currency.
+"the current one"); they are recorded as an unknown currency, to be
+filled in by hand where it matters: see [overrides.md](overrides.md).
 
 ## Other sources: Teamcraft
 
@@ -64,7 +65,8 @@ read.
 branch, fetched together by `bonsai refresh game`.
 
 **Known gap:** crowdsourced data is incomplete. An item with no source
-at all in the tree is reported as such, rather than guessed.
+at all in the tree is reported as such, rather than guessed; a missing
+source can be added by hand: see [overrides.md](overrides.md).
 
 ## Market: Universalis
 

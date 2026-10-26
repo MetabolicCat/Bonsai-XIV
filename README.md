@@ -48,8 +48,13 @@ Everything goes in the cache directory, `$XDG_CACHE_HOME/bonsai-xiv`
   they were fetched at;
 - `bonsai.sqlite` is the tree built from them.
 
-`build` reads only the cache, so the same cache always builds the same
-tree. See [docs/sources.md](docs/sources.md) for where the data comes
+`build` reads only the cache and the overrides, so the same cache
+always builds the same tree.
+
+Sources that are wrong or missing can be corrected by hand in
+`overrides.toml`, shared in the repository, or in
+`~/.config/bonsai-xiv/overrides.toml` for personal corrections: see
+[docs/overrides.md](docs/overrides.md). See [docs/sources.md](docs/sources.md) for where the data comes
 from and how each source is updated, and
 [docs/tree.md](docs/tree.md) for the tables in `bonsai.sqlite`.
 

@@ -1,6 +1,8 @@
 """Building a tree from a fake upstream, and reading it back."""
 
 import sqlite3
+from collections.abc import Sequence
+from pathlib import Path
 
 from upstream import Upstream
 
@@ -9,10 +11,12 @@ from bonsai.cache import Cache
 from bonsai.refresh import refresh_game
 
 
-def built(upstream: Upstream, cache: Cache) -> sqlite3.Connection:
+def built(
+    upstream: Upstream, cache: Cache, overrides: Sequence[Path] = ()
+) -> sqlite3.Connection:
     with upstream.client() as client:
         refresh_game(client, cache)
-    build(cache)
+    build(cache, overrides)
     return sqlite3.connect(cache.database)
 
 
@@ -34,7 +38,7 @@ def sources(db: sqlite3.Connection) -> list[Source]:
     for id, item, kind, ref, amount, cost_item, cost_amount in rows:
         found[id] = (item, kind, ref, amount)
         costs.setdefault(id, [])
-        if cost_item is not None:
+        if cost_amount is not None:
             costs[id].append((cost_item, cost_amount))
     return sorted(
         ((*found[id], tuple(sorted(costs[id]))) for id in found),

@@ -1,0 +1,3 @@
+# Corrections to the sources of the tree, shared by everyone who builds
+# it: see docs/overrides.md. Personal ones go in
+# ~/.config/bonsai-xiv/overrides.toml, which wins over this file.
