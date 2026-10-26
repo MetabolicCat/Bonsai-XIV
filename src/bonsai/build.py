@@ -49,6 +49,7 @@ CREATE TABLE source (
 CREATE INDEX source_item ON source (item_id);
 CREATE TABLE cost (
     source_id INTEGER NOT NULL,
+    -- NULL only while the build resolves unknown currencies.
     item_id INTEGER,
     amount INTEGER NOT NULL
 );
@@ -90,7 +91,7 @@ GIL = 1
 
 # In a special shop with a currency type, a cost below this id is an
 # index into another sheet that depends on the currency type and the
-# patch, not an item: it is recorded as an unknown currency.
+# patch, not an item: it is an unknown currency, to resolve.
 CURRENCY_INDEXES = 10
 
 # The costs of a trade, sorted.
@@ -154,7 +155,7 @@ def _build(
             " WHERE item_id NOT IN (SELECT id FROM item))"
         )
         db.execute("DELETE FROM source WHERE item_id NOT IN (SELECT id FROM item)")
-        _resolve_unknown_costs(db)
+        _resolve_currencies(db)
         _apply(db, corrections)
         meta = {
             "datamining_version": sheets.name,
@@ -345,15 +346,16 @@ def _add_source(
     )
 
 
-def _resolve_unknown_costs(db: sqlite3.Connection) -> None:
+def _resolve_currencies(db: sqlite3.Connection) -> None:
     """Resolve an unknown currency from the item's other trades.
 
     Vendors charge one price for an item in a given currency, though it
     differs from one currency to another: the item's other trades for
     the same amount, with every cost known, give its prices. When
     exactly one of them matches the trade's known costs and its unknown
-    costs' amounts, it is the trade's price; otherwise the currency
-    stays unknown.
+    costs' amounts, it is the trade's price. Otherwise the trade is left
+    out: the currencies that cannot be resolved this way are retired
+    tomestones, whose shops sell nothing any more.
     """
     trades: dict[int, tuple[int, int, list[tuple[int | None, int]]]] = {}
     for source, item, amount, cost_item, cost_amount in db.execute(
@@ -375,8 +377,10 @@ def _resolve_unknown_costs(db: sqlite3.Connection) -> None:
             for price in prices.get((item, amount), set())
             if _matches(costs, price)
         ]
-        if len(matching) == 1:
-            db.execute("DELETE FROM cost WHERE source_id = ?", (source,))
+        db.execute("DELETE FROM cost WHERE source_id = ?", (source,))
+        if len(matching) != 1:
+            db.execute("DELETE FROM source WHERE id = ?", (source,))
+        else:
             db.executemany(
                 "INSERT INTO cost VALUES (?, ?, ?)",
                 (

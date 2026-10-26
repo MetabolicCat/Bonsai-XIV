@@ -45,8 +45,11 @@ sheets that changed meaning from patch to patch (which tomestone is
 differs from one currency to another: such a cost is resolved to the
 one price, among the item's other trades for the same amount, that has
 the trade's known costs and the amounts of its unknown ones. When there
-is not exactly one, it is recorded as an unknown currency, to be filled
-in by hand where it matters: see [overrides.md](overrides.md).
+is not exactly one, the trade is left out: on the data so far, those
+are retired tomestones (Aesthetics, Heliometry, …) and placeholder rows,
+in shops that sell nothing any more, and every item they list has
+another source. A trade wrongly left out can be added back by hand:
+see [overrides.md](overrides.md).
 
 ## Other sources: Teamcraft
 

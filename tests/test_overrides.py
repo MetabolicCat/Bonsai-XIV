@@ -21,11 +21,10 @@ def upstream() -> Upstream:
     upstream.sheets["SpecialShop"] = [
         {
             "#": 1770417,
-            "UseCurrencyType": 16,
             "Item[0].Item[0]": SKIN,
             "Item[0].ReceiveCount[0]": 1,
-            "Item[0].ItemCost[0]": 1,
-            "Item[0].CurrencyCost[0]": 20,
+            "Item[0].ItemCost[0]": POETICS,
+            "Item[0].CurrencyCost[0]": 15,
         },
     ]
     return upstream
@@ -42,7 +41,7 @@ def test_without_overrides_the_sources_are_the_built_ones(
 ) -> None:
     assert sources(built(upstream, cache)) == [
         (IRON_ORE, "gil_shop", 262173, 1, ((1, 18),)),
-        (SKIN, "special_shop", 1770417, 1, ((None, 20),)),
+        (SKIN, "special_shop", 1770417, 1, ((POETICS, 15),)),
     ]
 
 
@@ -109,7 +108,7 @@ def test_an_override_removes_a_source(
     )
 
     assert sources(built(upstream, cache, [fix])) == [
-        (SKIN, "special_shop", 1770417, 1, ((None, 20),)),
+        (SKIN, "special_shop", 1770417, 1, ((POETICS, 15),)),
     ]
 
 

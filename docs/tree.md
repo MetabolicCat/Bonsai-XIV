@@ -93,7 +93,7 @@ What one shop trade costs: all of its rows are paid together.
 | Column | Type | Meaning |
 |---|---|---|
 | `source_id` | integer | the trade |
-| `item_id` | integer | item paid (1 is gil); unknown for some currencies, see [sources.md](sources.md) |
+| `item_id` | integer | item paid (1 is gil) |
 | `amount` | integer | how many |
 
 ### `leve`

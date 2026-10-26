@@ -308,9 +308,10 @@ def test_sources_of_items_without_a_name_are_left_out(
     assert sources(db) == [(5111, "gathering", 30, None, ())]
 
 
-def test_currency_indexes_teamcraft_cannot_resolve_are_unknown_costs(
+def test_trades_in_a_currency_that_cannot_be_resolved_are_left_out(
     upstream: Upstream, cache: Cache
 ) -> None:
+    """Such currencies are retired tomestones, whose shops sell no more."""
     upstream.sheets["Item"] = named(44000, 44001)
     upstream.sheets["SpecialShop"] = [
         {
@@ -338,7 +339,7 @@ def test_currency_indexes_teamcraft_cannot_resolve_are_unknown_costs(
     assert db.execute(
         "SELECT s.item_id, c.item_id, c.amount FROM source s"
         " JOIN cost c ON c.source_id = s.id ORDER BY s.item_id, c.amount"
-    ).fetchall() == [(44000, 25, 3), (44000, None, 20), (44001, 2, 5)]
+    ).fetchall() == [(44001, 2, 5)]
 
 
 def shop(shop: int, item: int, cost: int, amount: int) -> dict[str, object]:
@@ -372,7 +373,7 @@ def test_an_unknown_currency_takes_the_price_the_item_has_elsewhere(
     ]
 
 
-def test_an_unknown_currency_stays_unknown_when_other_prices_disagree(
+def test_an_unknown_currency_is_not_guessed_between_equal_prices(
     upstream: Upstream, cache: Cache
 ) -> None:
     upstream.sheets["Item"] = named(27737, 28, 33913)
@@ -384,7 +385,7 @@ def test_an_unknown_currency_stays_unknown_when_other_prices_disagree(
 
     db = built(upstream, cache)
 
-    assert (27737, "special_shop", 1770417, 1, ((None, 5),)) in sources(db)
+    assert [source[2] for source in sources(db)] == [1770053, 1770054]
 
 
 def test_an_unknown_currency_is_the_one_whose_price_matches(
