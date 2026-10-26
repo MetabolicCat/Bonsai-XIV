@@ -1,21 +1,9 @@
-from pathlib import Path
-
 import httpx
 import pytest
 from upstream import Upstream
 
 from bonsai.cache import Cache
 from bonsai.refresh import refresh_game
-
-
-@pytest.fixture
-def upstream() -> Upstream:
-    return Upstream()
-
-
-@pytest.fixture
-def cache(tmp_path: Path) -> Cache:
-    return Cache(tmp_path / "cache")
 
 
 def refresh(upstream: Upstream, cache: Cache) -> list[str]:
