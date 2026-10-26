@@ -13,6 +13,31 @@ TEAMCRAFT_EXTRACTS = "libs/data/src/lib/extracts/extracts.json"
 
 Row = dict[str, Any]
 
+# The columns Bonsai reads, with a neutral value, so that a test sets
+# only the ones it is about: the real sheets always have every column.
+DEFAULTS: dict[str, Row] = {
+    "Item": {
+        "Name": "",
+        "StackSize": 1,
+        "CanBeHq": "False",
+        "IsUntradable": "False",
+        "ItemSearchCategory": 0,
+        "ItemUICategory": 0,
+        "LevelItem": 1,
+        "LevelEquip": 1,
+    },
+    "Recipe": {
+        "CraftType": 0,
+        "ItemResult": 0,
+        "AmountResult": 1,
+        "RecipeLevelTable": 0,
+        "SecretRecipeBook": 0,
+        "IsExpert": "False",
+        **{f"Ingredient[{i}]": 0 for i in range(8)},
+        **{f"AmountIngredient[{i}]": 0 for i in range(8)},
+    },
+}
+
 
 class Upstream:
     """Serves sheets, Teamcraft extracts and market data at a commit.
@@ -58,7 +83,8 @@ class Upstream:
         prefix = f"{DATAMINING_RAW}/{self.datamining_commit}/csv/en/"
         if path.startswith(prefix) and path.endswith(".csv"):
             sheet = path.removeprefix(prefix).removesuffix(".csv")
-            return httpx.Response(200, text=_csv(self.sheets.get(sheet, [])))
+            rows = self.sheets.get(sheet, [])
+            return httpx.Response(200, text=_csv(DEFAULTS.get(sheet, {}), rows))
         if path == f"{TEAMCRAFT_RAW}/{self.teamcraft_commit}/{TEAMCRAFT_EXTRACTS}":
             return httpx.Response(200, text=json.dumps(self.extracts))
         return httpx.Response(404)
@@ -74,10 +100,13 @@ class Upstream:
         return httpx.Response(200, json={"results": results, "failedItems": failed})
 
 
-def _csv(rows: list[Row]) -> str:
-    columns = ["#"] + sorted({key for row in rows for key in row} - {"#"})
+def _csv(defaults: Row, rows: list[Row]) -> str:
+    columns = [
+        "#",
+        *sorted(defaults.keys() | {key for row in rows for key in row} - {"#"}),
+    ]
     out = io.StringIO()
     writer = csv.DictWriter(out, fieldnames=columns, restval="0")
     writer.writeheader()
-    writer.writerows(rows)
+    writer.writerows({**defaults, **row} for row in rows)
     return out.getvalue()
