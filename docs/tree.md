@@ -112,6 +112,10 @@ Crafting leve turn-ins.
 Market data of the latest Universalis snapshot, one row per item and
 quality; items that never sold have no row.
 
+The prices are Universalis' as they are. On thinly traded items they
+include sales that only move gil between players, at absurd prices:
+rules that weigh prices must clamp them.
+
 | Column | Type | Meaning |
 |---|---|---|
 | `item_id` | integer | the item |
