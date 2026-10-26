@@ -339,3 +339,49 @@ def test_currency_indexes_teamcraft_cannot_resolve_are_unknown_costs(
         "SELECT s.item_id, c.item_id, c.amount FROM source s"
         " JOIN cost c ON c.source_id = s.id ORDER BY s.item_id, c.amount"
     ).fetchall() == [(44000, 25, 3), (44000, None, 20), (44001, 2, 5)]
+
+
+def shop(shop: int, item: int, cost: int, amount: int) -> dict[str, object]:
+    """A special shop with a currency type, selling `item` for one cost."""
+    return {
+        "#": shop,
+        "UseCurrencyType": 16,
+        "Item[0].Item[0]": item,
+        "Item[0].ReceiveCount[0]": 1,
+        "Item[0].ItemCost[0]": cost,
+        "Item[0].CurrencyCost[0]": amount,
+    }
+
+
+def test_an_unknown_currency_takes_the_price_the_item_has_elsewhere(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.sheets["Item"] = named(27737, 28)
+    upstream.sheets["SpecialShop"] = [
+        shop(1770417, 27737, 1, 5),
+        shop(1770418, 27737, 2, 5),
+        shop(1770053, 27737, 28, 5),
+    ]
+
+    db = built(upstream, cache)
+
+    assert sources(db) == [
+        (27737, "special_shop", 1770053, 1, ((28, 5),)),
+        (27737, "special_shop", 1770417, 1, ((28, 5),)),
+        (27737, "special_shop", 1770418, 1, ((28, 5),)),
+    ]
+
+
+def test_an_unknown_currency_stays_unknown_when_other_prices_disagree(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.sheets["Item"] = named(27737, 28, 33913)
+    upstream.sheets["SpecialShop"] = [
+        shop(1770417, 27737, 1, 5),
+        shop(1770053, 27737, 28, 5),
+        shop(1770054, 27737, 33913, 5),
+    ]
+
+    db = built(upstream, cache)
+
+    assert (27737, "special_shop", 1770417, 1, ((None, 5),)) in sources(db)

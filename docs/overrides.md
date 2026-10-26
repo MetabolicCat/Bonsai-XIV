@@ -1,9 +1,11 @@
 # Overrides
 
-The sources are sometimes wrong or incomplete: a shop Teamcraft does
-not know, whose costs the game data holds as currency indexes; a drop
-nobody reported. Overrides correct the `source` and `cost` tables of the
-tree (see [tree.md](tree.md)) by hand.
+The sources are sometimes wrong or incomplete, mostly in the days after
+a patch, before they catch up: a shop Teamcraft does not know yet, whose
+costs the game data holds as currency indexes; a drop nobody reported.
+Overrides correct the `source` and `cost` tables of the tree (see
+[tree.md](tree.md)) by hand, and are best removed once the sources have
+caught up.
 
 ## Files
 

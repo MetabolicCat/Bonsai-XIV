@@ -151,6 +151,7 @@ def _build(
             " WHERE item_id NOT IN (SELECT id FROM item))"
         )
         db.execute("DELETE FROM source WHERE item_id NOT IN (SELECT id FROM item)")
+        _resolve_unknown_costs(db)
         _apply(db, corrections)
         meta = {
             "datamining_version": sheets.name,
@@ -339,6 +340,38 @@ def _add_source(
         "INSERT INTO cost VALUES (?, ?, ?)",
         ((source, cost_item, cost_amount) for cost_item, cost_amount in costs or []),
     )
+
+
+def _resolve_unknown_costs(db: sqlite3.Connection) -> None:
+    """Give a trade with an unknown currency the price the item has elsewhere.
+
+    Vendors charge the same price for an item, so the item's other
+    trades for the same amount, with every cost known, give the price.
+    When they disagree, the currency stays unknown.
+    """
+    trades: dict[int, tuple[int, int, list[tuple[int | None, int]]]] = {}
+    for source, item, amount, cost_item, cost_amount in db.execute(
+        "SELECT s.id, s.item_id, s.amount, c.item_id, c.amount"
+        " FROM source s JOIN cost c ON c.source_id = s.id"
+    ):
+        trades.setdefault(source, (item, amount, []))[2].append(
+            (cost_item, cost_amount)
+        )
+    prices: dict[tuple[int, int], set[tuple[tuple[int | None, int], ...]]] = {}
+    for item, amount, costs in trades.values():
+        if all(cost_item is not None for cost_item, _ in costs):
+            prices.setdefault((item, amount), set()).add(tuple(sorted(costs)))
+    for source, (item, amount, costs) in trades.items():
+        known = prices.get((item, amount), set())
+        if any(cost_item is None for cost_item, _ in costs) and len(known) == 1:
+            db.execute("DELETE FROM cost WHERE source_id = ?", (source,))
+            db.executemany(
+                "INSERT INTO cost VALUES (?, ?, ?)",
+                (
+                    (source, cost_item, cost_amount)
+                    for cost_item, cost_amount in next(iter(known))
+                ),
+            )
 
 
 def _apply(db: sqlite3.Connection, corrections: dict[Key, Overrides]) -> None:
