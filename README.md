@@ -38,7 +38,7 @@ uv run bonsai status            # show what the cache holds and how old it is
 `refresh game` downloads the game data only when its sources have
 moved since the last fetch. `refresh market` fetches prices for every
 marketable item in the tree from the `Japan` region by default; use
-`--region` for another Universalis region, data center or world.
+`--scope` for another Universalis region, data center or world.
 
 Everything goes in the cache directory, `$XDG_CACHE_HOME/bonsai-xiv`
 (`~/.cache/bonsai-xiv` by default), or the one given with
