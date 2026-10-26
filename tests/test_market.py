@@ -129,3 +129,28 @@ class AnyIsoTime:
         return isinstance(other, str) and bool(
             re.fullmatch(r"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ", other)
         )
+
+
+def test_progress_is_reported_after_each_batch(
+    upstream: Upstream, cache: Cache
+) -> None:
+    items = range(10000, 10150)
+    upstream.sheets["Item"] += [
+        {"#": item, "Name": f"Item {item}", "ItemSearchCategory": 48} for item in items
+    ]
+    upstream.sheets["Recipe"] += [
+        {"#": item, "CraftType": 1, "ItemResult": item, "RecipeLevelTable": 1}
+        for item in items
+    ]
+    upstream.datamining_commit = "f" * 40
+    with upstream.client() as client:
+        refresh_game(client, cache)
+    build(cache)
+    reports: list[tuple[int, int]] = []
+
+    with upstream.client() as client:
+        refresh_market(
+            client, cache, "Japan", progress=lambda *done: reports.append(done)
+        )
+
+    assert reports == [(100, 152), (152, 152)]

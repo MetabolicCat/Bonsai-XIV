@@ -25,11 +25,17 @@ def refresh_game(client: httpx.Client, cache: Cache) -> list[str]:
     return downloaded
 
 
-def refresh_market(client: httpx.Client, cache: Cache, scope: str) -> int:
+def refresh_market(
+    client: httpx.Client,
+    cache: Cache,
+    scope: str,
+    progress: universalis.Progress | None = None,
+) -> int:
     """Download the market data in `scope` of the tree's marketable items.
 
     `scope` is a Universalis region, data center or world. Returns the
-    number of items asked for.
+    number of items asked for. `progress` is called after each request
+    with the number of items done and the total.
     """
     if not cache.database.exists():
         raise RuntimeError("no tree to price: run `bonsai refresh game` first")
@@ -51,5 +57,5 @@ def refresh_market(client: httpx.Client, cache: Cache, scope: str) -> int:
     fetched_at = datetime.now(UTC)
     version = fetched_at.strftime("%Y%m%dT%H%M%SZ")
     with cache.download(universalis.NAME, version) as directory:
-        universalis.fetch(client, scope, items, fetched_at, directory)
+        universalis.fetch(client, scope, items, fetched_at, directory, progress)
     return len(items)

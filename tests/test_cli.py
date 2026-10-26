@@ -55,3 +55,22 @@ def test_build_without_game_data_fails_with_a_hint(
     assert run(upstream, tmp_path, "build") == 1
 
     assert "bonsai refresh game" in capsys.readouterr().err
+
+
+def test_refresh_market_shows_its_progress(
+    tmp_path: Path, upstream: Upstream, capsys: pytest.CaptureFixture[str]
+) -> None:
+    upstream.sheets["Item"] = [
+        {"#": 5057, "Name": "Iron Ingot", "ItemSearchCategory": 48},
+    ]
+    upstream.sheets["CraftType"] = [{"#": 1, "Name": "Smithing"}]
+    upstream.sheets["RecipeLevelTable"] = [{"#": 1, "ClassJobLevel": 1, "Stars": 0}]
+    upstream.sheets["Recipe"] = [
+        {"#": 43, "CraftType": 1, "ItemResult": 5057, "RecipeLevelTable": 1}
+    ]
+    run(upstream, tmp_path, "refresh", "game")
+    capsys.readouterr()
+
+    assert run(upstream, tmp_path, "refresh", "market") == 0
+
+    assert "pricing items: 1/1" in capsys.readouterr().err

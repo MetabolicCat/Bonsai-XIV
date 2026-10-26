@@ -1,7 +1,7 @@
 """Market prices and sale velocity, from Universalis."""
 
 import json
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import datetime
 from itertools import batched
 from pathlib import Path
@@ -21,6 +21,8 @@ SCOPES = ("world", "dc", "region")
 
 ISO_TIME = "%Y-%m-%dT%H:%M:%SZ"
 
+Progress = Callable[[int, int], None]
+
 
 def fetch(
     client: httpx.Client,
@@ -28,13 +30,22 @@ def fetch(
     items: list[int],
     fetched_at: datetime,
     directory: Path,
+    progress: Progress | None = None,
 ) -> None:
-    """Download the market data of `items` in `scope` into `directory`."""
-    results = []
+    """Download the market data of `items` in `scope` into `directory`.
+
+    `progress` is called after each request with the number of items
+    done and the total.
+    """
+    results: list[dict[str, Any]] = []
+    done = 0
     for batch in batched(items, BATCH):
         response = client.get(f"{API}/aggregated/{scope}/{','.join(map(str, batch))}")
         response.raise_for_status()
         results.extend(response.json()["results"])
+        done += len(batch)
+        if progress:
+            progress(done, len(items))
     snapshot = {
         "scope": scope,
         "fetched_at": fetched_at.strftime(ISO_TIME),

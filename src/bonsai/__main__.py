@@ -31,13 +31,18 @@ def main(argv: list[str] | None = None, client: httpx.Client | None = None) -> i
                     downloaded = refresh_game(http, cache)
                     print(f"downloaded: {', '.join(downloaded) or 'nothing new'}")
                 else:
-                    count = refresh_market(http, cache, args.scope)
+                    count = refresh_market(http, cache, args.scope, _show_progress)
+                    print(file=sys.stderr)
                     print(f"priced {count} items in {args.scope}")
         build(cache)
         return 0
     except (RuntimeError, httpx.HTTPError) as error:
         print(f"bonsai: {error}", file=sys.stderr)
         return 1
+
+
+def _show_progress(done: int, total: int) -> None:
+    print(f"\rpricing items: {done}/{total}", end="", file=sys.stderr, flush=True)
 
 
 def _parser() -> argparse.ArgumentParser:
