@@ -133,6 +133,10 @@ def test_recipe_level_and_master_book(upstream: Upstream, cache: Cache) -> None:
     ]
 
 
+def named(*items: int) -> list[dict[str, object]]:
+    return [{"#": item, "Name": f"Item {item}"} for item in items]
+
+
 def sources(db: sqlite3.Connection) -> list[tuple[object, ...]]:
     return db.execute(
         "SELECT * FROM source ORDER BY item_id, kind, ref, cost_item_id"
@@ -142,6 +146,7 @@ def sources(db: sqlite3.Connection) -> list[tuple[object, ...]]:
 def test_gathered_and_fished_items_have_a_source(
     upstream: Upstream, cache: Cache
 ) -> None:
+    upstream.sheets["Item"] = named(4776, 5111, 7684)
     upstream.sheets["GatheringItem"] = [{"#": 0, "Item": 0}, {"#": 30, "Item": 5111}]
     upstream.sheets["FishParameter"] = [{"#": 1, "Item": 4776}]
     upstream.sheets["SpearfishingItem"] = [{"#": 20000, "Item": 7684}]
@@ -159,6 +164,7 @@ def test_shops_record_what_an_item_costs(upstream: Upstream, cache: Cache) -> No
     upstream.sheets["Item"] = [
         {"#": 5111, "Name": "Iron Ore", "PriceMid": 18},
         {"#": 28, "Name": "Allagan Tomestone of Poetics"},
+        *named(6968, 6969),
     ]
     upstream.sheets["GilShopItem"] = [
         {"#": "262144.0", "Item": 5111},
@@ -206,6 +212,7 @@ def test_crafting_leves_record_their_turn_ins(upstream: Upstream, cache: Cache) 
 def test_monster_drops_and_duty_loot_come_from_teamcraft(
     upstream: Upstream, cache: Cache
 ) -> None:
+    upstream.sheets["Item"] = named(2, 5551, 20001)
     upstream.extracts = {
         "5551": {
             "id": 5551,
@@ -226,3 +233,21 @@ def test_monster_drops_and_duty_loot_come_from_teamcraft(
         (20001, "instance", 9, None, None),
         (20001, "instance", 52, None, None),
     ]
+
+
+def test_sources_of_items_without_a_name_are_left_out(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.sheets["Item"] = [
+        {"#": 5111, "Name": "Iron Ore"},
+        {"#": 8219, "Name": ""},
+    ]
+    upstream.sheets["GatheringItem"] = [
+        {"#": 30, "Item": 5111},
+        {"#": 31, "Item": 8219},
+        {"#": 32, "Item": 2003558},
+    ]
+
+    db = built(upstream, cache)
+
+    assert sources(db) == [(5111, "gathering", 30, None, None)]

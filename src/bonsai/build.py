@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from bonsai.cache import Cache
-from bonsai.sources import datamining, teamcraft
+from bonsai.sources import datamining, teamcraft, universalis
 
 SCHEMA = """
 CREATE TABLE item (
@@ -52,6 +52,18 @@ CREATE TABLE leve (
     amount INTEGER NOT NULL
 );
 CREATE INDEX leve_item ON leve (item_id);
+CREATE TABLE market (
+    item_id INTEGER NOT NULL,
+    hq BOOLEAN NOT NULL,
+    min_listing INTEGER,
+    average_price REAL,
+    daily_velocity REAL,
+    PRIMARY KEY (item_id, hq)
+);
+CREATE TABLE meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 """
 
 # A recipe has up to this many ingredients, crystals included.
@@ -87,6 +99,21 @@ def build(cache: Cache) -> None:
             "INSERT INTO source VALUES (?, ?, ?, NULL, NULL)",
             teamcraft.sources(extracts),
         )
+        # Quest event items and unnamed placeholders are not in the tree.
+        db.execute("DELETE FROM source WHERE item_id NOT IN (SELECT id FROM item)")
+        meta = {
+            "datamining_version": sheets.name,
+            "teamcraft_version": extracts.name,
+        }
+        market_version = cache.version(universalis.NAME)
+        if market_version is not None:
+            market = cache.directory(universalis.NAME, market_version)
+            db.executemany(
+                "INSERT INTO market VALUES (?, ?, ?, ?, ?)",
+                universalis.prices(market),
+            )
+            meta |= universalis.meta(market)
+        db.executemany("INSERT INTO meta VALUES (?, ?)", meta.items())
     db.close()
 
 

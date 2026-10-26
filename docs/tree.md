@@ -56,7 +56,9 @@ Crystals, shards and clusters are ingredients like any other.
 
 ### `source`
 
-The ways to obtain an item other than crafting it.
+The ways to obtain an item other than crafting it. Only items of the
+`item` table have sources: quest event items and unnamed placeholders
+are left out.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -64,7 +66,10 @@ The ways to obtain an item other than crafting it.
 | `kind` | text | see below |
 | `ref` | integer | id of the shop, gathering item, fish, monster or duty |
 | `cost_item_id` | integer | item paid, for shops (1 is gil) |
-| `cost_amount` | integer | how many are paid, for shops |
+| `cost_amount` | integer | how many are paid per trade, for shops |
+
+A special shop trade with several costs has one row per cost, all of
+them paid together.
 
 | `kind` | From | `ref` |
 |---|---|---|
