@@ -28,15 +28,18 @@ DEFAULTS: dict[str, Row] = {
         "PriceMid": 0,
     },
     "SpecialShop": {
-        f"Item[{trade}].{column}[{i}]": 0
-        for trade in range(60)
-        for column, slots in [
-            ("Item", 2),
-            ("ReceiveCount", 2),
-            ("ItemCost", 3),
-            ("CurrencyCost", 3),
-        ]
-        for i in range(slots)
+        "UseCurrencyType": 0,
+        **{
+            f"Item[{trade}].{column}[{i}]": 0
+            for trade in range(60)
+            for column, slots in [
+                ("Item", 2),
+                ("ReceiveCount", 2),
+                ("ItemCost", 3),
+                ("CurrencyCost", 3),
+            ]
+            for i in range(slots)
+        },
     },
     "CraftLeve": {
         "Leve": 0,

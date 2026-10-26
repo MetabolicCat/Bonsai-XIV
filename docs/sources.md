@@ -8,7 +8,7 @@ the network and the same cache always gives the same tree.
 | Source | What it provides | Version | Changes |
 |---|---|---|---|
 | [xivapi/ffxiv-datamining] | Items, recipes, shops, gathering, fishing, leves | git commit | each game patch |
-| [ffxiv-teamcraft] | Monster drops, duty loot | git commit | continuously, crowdsourced |
+| [ffxiv-teamcraft] | Drops, duty loot, trades and other sources | git commit | continuously, crowdsourced |
 | [Universalis] | Market prices and sale velocity | fetch time | continuously |
 
 [xivapi/ffxiv-datamining]: https://github.com/xivapi/ffxiv-datamining
@@ -28,7 +28,7 @@ for everything the game files contain.
 | `RecipeLevelTable` | recipe job level and stars |
 | `CraftType` | crafting job of a recipe |
 | `GilShopItem` | items sold for gil (price: `Item.PriceMid`) |
-| `SpecialShop` | items traded for other items: currencies, tokens, scrips |
+| `SpecialShop` | items traded for other items, where Teamcraft has none |
 | `GatheringItem` | items gathered by miner and botanist |
 | `FishParameter`, `SpearfishingItem` | items caught by fisher |
 | `CraftLeve`, `Leve` | crafting leve turn-ins and their level |
@@ -37,24 +37,28 @@ for everything the game files contain.
 default branch, and downloads the sheets at that commit when it is not
 the one already cached. The repository follows the game's patches.
 
-**Known gap:** `SpecialShop` costs are recorded as the raw cost item id.
-For some shops (tomestones, scrips) that id is an index the game
-resolves through another sheet; decoding it is left for when a pruning
-rule needs currency costs.
+For special shops, Teamcraft's trades are used instead of the
+`SpecialShop` sheet where it has them (see below); the sheet covers the
+shops Teamcraft lacks. In those, some costs are indexes into currency
+sheets that changed meaning from patch to patch (which tomestone is
+"the current one"); they are recorded as an unknown currency.
 
-## Monster drops and duty loot: Teamcraft
+## Other sources: Teamcraft
 
 The game files hold no drop tables. Teamcraft crowdsources them from
 its users and publishes them, MIT licensed, in its repository as
 `libs/data/src/lib/extracts/extracts.json`: for every item, the list of
-its sources. Bonsai reads two source types from it:
+its sources. Bonsai reads from it:
 
-- `DROPS` (10): the monsters that drop the item;
-- `INSTANCES` (6): the duties whose loot includes the item.
+- monster drops, duty loot, FATEs, treasure maps, ventures, voyages,
+  gardening, desynthesis, aetherial reduction and quests;
+- shop trades. For special shops it resolves the costs that the
+  `SpecialShop` sheet holds as indexes into other sheets (tomestones,
+  scrips); it also has shops outside that sheet, such as grand company
+  ones.
 
-The other source types it holds (desynthesis, ventures, voyages, …)
-are not imported: they are not ways to farm a base ingredient on
-purpose.
+Gil shops come from the game data; Teamcraft's vendor entries are not
+read.
 
 **Update:** same as the game data, at the head of Teamcraft's default
 branch, fetched together by `bonsai refresh game`.

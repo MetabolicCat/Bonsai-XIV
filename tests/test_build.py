@@ -137,10 +137,26 @@ def named(*items: int) -> list[dict[str, object]]:
     return [{"#": item, "Name": f"Item {item}"} for item in items]
 
 
-def sources(db: sqlite3.Connection) -> list[tuple[object, ...]]:
-    return db.execute(
-        "SELECT * FROM source ORDER BY item_id, kind, ref, cost_item_id"
+Source = tuple[int, str, int | None, int | None, tuple[tuple[int, int], ...]]
+
+
+def sources(db: sqlite3.Connection) -> list[Source]:
+    """Every (item, kind, ref, amount received, costs) source."""
+    rows = db.execute(
+        "SELECT s.id, s.item_id, s.kind, s.ref, s.amount, c.item_id, c.amount"
+        " FROM source s LEFT JOIN cost c ON c.source_id = s.id"
     ).fetchall()
+    found: dict[int, tuple[int, str, int | None, int | None]] = {}
+    costs: dict[int, list[tuple[int, int]]] = {}
+    for id, item, kind, ref, amount, cost_item, cost_amount in rows:
+        found[id] = (item, kind, ref, amount)
+        costs.setdefault(id, [])
+        if cost_item is not None:
+            costs[id].append((cost_item, cost_amount))
+    return sorted(
+        ((*found[id], tuple(sorted(costs[id]))) for id in found),
+        key=lambda source: (source[0], source[1], source[2] or 0, source[4]),
+    )
 
 
 def test_gathered_and_fished_items_have_a_source(
@@ -154,16 +170,15 @@ def test_gathered_and_fished_items_have_a_source(
     db = built(upstream, cache)
 
     assert sources(db) == [
-        (4776, "fishing", 1, None, None),
-        (5111, "gathering", 30, None, None),
-        (7684, "fishing", 20000, None, None),
+        (4776, "fishing", 1, None, ()),
+        (5111, "gathering", 30, None, ()),
+        (7684, "fishing", 20000, None, ()),
     ]
 
 
-def test_shops_record_what_an_item_costs(upstream: Upstream, cache: Cache) -> None:
+def test_shops_record_what_a_trade_costs(upstream: Upstream, cache: Cache) -> None:
     upstream.sheets["Item"] = [
         {"#": 5111, "Name": "Iron Ore", "PriceMid": 18},
-        {"#": 28, "Name": "Allagan Tomestone of Poetics"},
         *named(6968, 6969),
     ]
     upstream.sheets["GilShopItem"] = [
@@ -183,17 +198,90 @@ def test_shops_record_what_an_item_costs(upstream: Upstream, cache: Cache) -> No
             "Item[1].ReceiveCount[0]": 1,
             "Item[1].ItemCost[0]": 7000,
             "Item[1].CurrencyCost[0]": 20,
+            "Item[2].Item[0]": 6968,
+            "Item[2].ReceiveCount[0]": 2,
+            "Item[2].ItemCost[0]": 29,
+            "Item[2].CurrencyCost[0]": 3,
         },
     ]
 
     db = built(upstream, cache)
 
     assert sources(db) == [
-        (5111, "gil_shop", 262144, 1, 18),
-        (5111, "gil_shop", 262145, 1, 18),
-        (6968, "special_shop", 1769485, 28, 5),
-        (6968, "special_shop", 1769485, 7000, 10),
-        (6969, "special_shop", 1769485, 7000, 20),
+        (5111, "gil_shop", 262144, 1, ((1, 18),)),
+        (5111, "gil_shop", 262145, 1, ((1, 18),)),
+        (6968, "special_shop", 1769485, 1, ((28, 5), (7000, 10))),
+        (6968, "special_shop", 1769485, 2, ((29, 3),)),
+        (6969, "special_shop", 1769485, 1, ((7000, 20),)),
+    ]
+
+
+def test_teamcraft_trades_replace_the_sheet_for_the_shops_it_knows(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.sheets["Item"] = named(5111, 7294, 7295)
+    upstream.sheets["SpecialShop"] = [
+        {
+            "#": 1769500,
+            "Item[0].Item[0]": 7294,
+            "Item[0].ReceiveCount[0]": 1,
+            # The tomestone, as an index the game resolves elsewhere.
+            "Item[0].ItemCost[0]": 1,
+            "Item[0].CurrencyCost[0]": 100,
+        },
+        {
+            "#": 1769501,
+            "Item[0].Item[0]": 7295,
+            "Item[0].ReceiveCount[0]": 1,
+            "Item[0].ItemCost[0]": 28,
+            "Item[0].CurrencyCost[0]": 50,
+        },
+    ]
+
+    def trade(
+        shop: dict[str, object], item: int, *costs: tuple[int, int]
+    ) -> dict[str, object]:
+        return {
+            **shop,
+            "trades": [
+                {
+                    "currencies": [{"id": i, "amount": a} for i, a in costs],
+                    "items": [{"id": item, "amount": 1}, {"id": 99999, "amount": 1}],
+                }
+            ],
+        }
+
+    upstream.extracts = {
+        "7294": {
+            "sources": [
+                {
+                    "type": 2,
+                    "data": [
+                        trade({"id": 1769500, "type": "SpecialShop"}, 7294, (28, 100))
+                    ],
+                }
+            ]
+        },
+        "5111": {
+            "sources": [
+                {
+                    "type": 2,
+                    "data": [
+                        trade({"id": 1441793, "type": "GCShop"}, 5111, (20, 200)),
+                        trade({}, 5111, (29894, 10)),
+                    ],
+                }
+            ]
+        },
+    }
+
+    db = built(upstream, cache)
+
+    assert sources(db) == [
+        (5111, "trade", None, 1, ((29894, 10),)),
+        (5111, "trade", 1441793, 1, ((20, 200),)),
+        (7294, "special_shop", 1769500, 1, ((28, 100),)),
+        (7295, "special_shop", 1769501, 1, ((28, 50),)),
     ]
 
 
@@ -209,30 +297,44 @@ def test_crafting_leves_record_their_turn_ins(upstream: Upstream, cache: Cache) 
     assert db.execute("SELECT * FROM leve").fetchall() == [(36, 5, 1823, 3)]
 
 
-def test_monster_drops_and_duty_loot_come_from_teamcraft(
-    upstream: Upstream, cache: Cache
+@pytest.mark.parametrize(
+    ("type", "data", "kind", "refs"),
+    [
+        (10, [{"id": 38}, {"id": 112}], "drop", [38, 112]),
+        (6, [9, 52], "instance", [9, 52]),
+        (8, {"seedItemId": 15865, "duration": 18}, "gardening", [15865]),
+        (18, [68639], "quest", [68639]),
+        (9, [{"type": 1, "name": {"en": "Sea of Ash 1", "id": 35}}], "voyage", [35]),
+        (13, [6688, 6689], "treasure", [6688, 6689]),
+        (5, [33319], "desynthesis", [33319]),
+        (4, [33153], "reduction", [33153]),
+        (15, [{"id": 70, "lvl": 1}], "venture", [70]),
+        (14, [{"id": 506, "level": 50}], "fate", [506]),
+    ],
+)
+def test_other_ways_to_obtain_an_item_come_from_teamcraft(
+    upstream: Upstream,
+    cache: Cache,
+    type: int,
+    data: object,
+    kind: str,
+    refs: list[int],
 ) -> None:
-    upstream.sheets["Item"] = named(2, 5551, 20001)
+    upstream.sheets["Item"] = named(2, 5551)
     upstream.extracts = {
         "5551": {
             "id": 5551,
             "sources": [
                 {"type": 3, "data": [{"npcId": 1000217, "price": 63}]},
-                {"type": 10, "data": [{"id": 38}, {"id": 112}]},
+                {"type": type, "data": data},
             ],
         },
-        "20001": {"id": 20001, "sources": [{"type": 6, "data": [9, 52]}]},
         "2": {"id": 2},
     }
 
     db = built(upstream, cache)
 
-    assert sources(db) == [
-        (5551, "drop", 38, None, None),
-        (5551, "drop", 112, None, None),
-        (20001, "instance", 9, None, None),
-        (20001, "instance", 52, None, None),
-    ]
+    assert sources(db) == [(5551, kind, ref, None, ()) for ref in refs]
 
 
 def test_sources_of_items_without_a_name_are_left_out(
@@ -250,4 +352,37 @@ def test_sources_of_items_without_a_name_are_left_out(
 
     db = built(upstream, cache)
 
-    assert sources(db) == [(5111, "gathering", 30, None, None)]
+    assert sources(db) == [(5111, "gathering", 30, None, ())]
+
+
+def test_currency_indexes_teamcraft_cannot_resolve_are_unknown_costs(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.sheets["Item"] = named(44000, 44001)
+    upstream.sheets["SpecialShop"] = [
+        {
+            "#": 1770417,
+            "UseCurrencyType": 16,
+            "Item[0].Item[0]": 44000,
+            "Item[0].ReceiveCount[0]": 1,
+            "Item[0].ItemCost[0]": 1,
+            "Item[0].CurrencyCost[0]": 20,
+            "Item[0].ItemCost[1]": 25,
+            "Item[0].CurrencyCost[1]": 3,
+        },
+        {
+            "#": 1769000,
+            "UseCurrencyType": 0,
+            "Item[0].Item[0]": 44001,
+            "Item[0].ReceiveCount[0]": 1,
+            "Item[0].ItemCost[0]": 2,
+            "Item[0].CurrencyCost[0]": 5,
+        },
+    ]
+
+    db = built(upstream, cache)
+
+    assert db.execute(
+        "SELECT s.item_id, c.item_id, c.amount FROM source s"
+        " JOIN cost c ON c.source_id = s.id ORDER BY s.item_id, c.amount"
+    ).fetchall() == [(44000, 25, 3), (44000, None, 20), (44001, 2, 5)]

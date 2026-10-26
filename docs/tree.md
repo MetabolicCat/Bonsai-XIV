@@ -56,29 +56,45 @@ Crystals, shards and clusters are ingredients like any other.
 
 ### `source`
 
-The ways to obtain an item other than crafting it. Only items of the
-`item` table have sources: quest event items and unnamed placeholders
-are left out.
+The ways to obtain an item other than crafting it, one row per way: a
+shop trade is one way. Only items of the `item` table have sources:
+quest event items and unnamed placeholders are left out.
 
 | Column | Type | Meaning |
 |---|---|---|
+| `id` | integer | source id |
 | `item_id` | integer | the item |
 | `kind` | text | see below |
-| `ref` | integer | id of the shop, gathering item, fish, monster or duty |
-| `cost_item_id` | integer | item paid, for shops (1 is gil) |
-| `cost_amount` | integer | how many are paid per trade, for shops |
-
-A special shop trade with several costs has one row per cost, all of
-them paid together.
+| `ref` | integer | what `kind` says; unknown for some Teamcraft trades |
+| `amount` | integer | items received per trade, for shops |
 
 | `kind` | From | `ref` |
 |---|---|---|
 | `gathering` | `GatheringItem` | gathering item id |
 | `fishing` | `FishParameter`, `SpearfishingItem` | fish parameter or spearfishing item id |
 | `gil_shop` | `GilShopItem` | gil shop id |
-| `special_shop` | `SpecialShop` | special shop id |
+| `special_shop` | Teamcraft, else `SpecialShop` | special shop id |
+| `trade` | Teamcraft | other shop id: grand company, collectables… |
 | `drop` | Teamcraft | monster id |
 | `instance` | Teamcraft | duty (instance content) id |
+| `fate` | Teamcraft | FATE id |
+| `treasure` | Teamcraft | treasure map item id |
+| `venture` | Teamcraft | retainer venture id |
+| `voyage` | Teamcraft | airship or submarine destination id |
+| `gardening` | Teamcraft | seed item id |
+| `desynthesis` | Teamcraft | item desynthesised |
+| `reduction` | Teamcraft | item aetherially reduced |
+| `quest` | Teamcraft | quest id |
+
+### `cost`
+
+What one shop trade costs: all of its rows are paid together.
+
+| Column | Type | Meaning |
+|---|---|---|
+| `source_id` | integer | the trade |
+| `item_id` | integer | item paid (1 is gil); unknown for some currencies, see [sources.md](sources.md) |
+| `amount` | integer | how many |
 
 ### `leve`
 

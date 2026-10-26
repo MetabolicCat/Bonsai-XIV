@@ -38,13 +38,19 @@ CREATE TABLE ingredient (
 );
 CREATE INDEX ingredient_item ON ingredient (item_id);
 CREATE TABLE source (
+    id INTEGER PRIMARY KEY,
     item_id INTEGER NOT NULL,
     kind TEXT NOT NULL,
-    ref INTEGER NOT NULL,
-    cost_item_id INTEGER,
-    cost_amount INTEGER
+    ref INTEGER,
+    amount INTEGER
 );
 CREATE INDEX source_item ON source (item_id);
+CREATE TABLE cost (
+    source_id INTEGER NOT NULL,
+    item_id INTEGER,
+    amount INTEGER NOT NULL
+);
+CREATE INDEX cost_source ON cost (source_id);
 CREATE TABLE leve (
     id INTEGER NOT NULL,
     level INTEGER NOT NULL,
@@ -80,6 +86,14 @@ TURN_IN_SLOTS = 4
 
 GIL = 1
 
+# In a special shop with a currency type, a cost below this id is an
+# index into another sheet that depends on the currency type and the
+# patch, not an item: it is recorded as an unknown currency.
+CURRENCY_INDEXES = 10
+
+# Teamcraft's name for the shops of the SpecialShop sheet.
+SPECIAL_SHOP = "SpecialShop"
+
 
 def build(cache: Cache) -> None:
     """Write the tree to `cache.database`, from the cache only."""
@@ -93,13 +107,15 @@ def build(cache: Cache) -> None:
         _recipes(db, sheets)
         _sources(db, sheets)
         _gil_shops(db, sheets)
-        _special_shops(db, sheets)
+        _trades(db, sheets, extracts)
         _leves(db, sheets)
-        db.executemany(
-            "INSERT INTO source VALUES (?, ?, ?, NULL, NULL)",
-            teamcraft.sources(extracts),
-        )
+        for item, kind, ref in teamcraft.sources(extracts):
+            _add_source(db, item, kind, ref)
         # Quest event items and unnamed placeholders are not in the tree.
+        db.execute(
+            "DELETE FROM cost WHERE source_id IN (SELECT id FROM source"
+            " WHERE item_id NOT IN (SELECT id FROM item))"
+        )
         db.execute("DELETE FROM source WHERE item_id NOT IN (SELECT id FROM item)")
         meta = {
             "datamining_version": sheets.name,
@@ -191,14 +207,9 @@ def _sources(db: sqlite3.Connection, sheets: Path) -> None:
         ("fishing", "FishParameter"),
         ("fishing", "SpearfishingItem"),
     ]:
-        db.executemany(
-            "INSERT INTO source VALUES (?, ?, ?, NULL, NULL)",
-            (
-                (int(row["Item"]), kind, int(row["#"]))
-                for row in datamining.rows(sheets, sheet)
-                if row["Item"] != "0"
-            ),
-        )
+        for row in datamining.rows(sheets, sheet):
+            if row["Item"] != "0":
+                _add_source(db, int(row["Item"]), kind, int(row["#"]))
 
 
 def _gil_shops(db: sqlite3.Connection, sheets: Path) -> None:
@@ -209,34 +220,46 @@ def _gil_shops(db: sqlite3.Connection, sheets: Path) -> None:
         for row in datamining.rows(sheets, "GilShopItem")
         if row["Item"] != "0"
     }
-    db.executemany(
-        "INSERT INTO source VALUES (?, 'gil_shop', ?, ?, ?)",
-        ((int(item), int(shop), GIL, prices[item]) for item, shop in sorted(sold)),
-    )
+    for item, shop in sorted(sold):
+        _add_source(db, int(item), "gil_shop", int(shop), 1, [(GIL, prices[item])])
 
 
-def _special_shops(db: sqlite3.Connection, sheets: Path) -> None:
+def _trades(db: sqlite3.Connection, sheets: Path, extracts: Path) -> None:
+    """Shop trades: Teamcraft's, and the sheet's for shops Teamcraft lacks.
+
+    Teamcraft resolves the costs that the SpecialShop sheet holds as
+    indexes into other sheets (tomestones, scrips); it also has trades
+    from shops other than special shops, such as grand company ones.
+    """
+    trades = list(teamcraft.trades(extracts))
+    known = {(t.item, t.shop) for t in trades if t.shop_type == SPECIAL_SHOP}
+    for trade in trades:
+        kind = "special_shop" if trade.shop_type == SPECIAL_SHOP else "trade"
+        _add_source(db, trade.item, kind, trade.shop, trade.amount, trade.costs)
+    for trade in _special_shops(sheets):
+        if (trade.item, trade.shop) not in known:
+            _add_source(
+                db, trade.item, "special_shop", trade.shop, trade.amount, trade.costs
+            )
+
+
+def _special_shops(sheets: Path) -> Iterator[teamcraft.Trade]:
     for row in datamining.rows(sheets, "SpecialShop"):
+        indexes = row["UseCurrencyType"] != "0"
         for trade in range(TRADE_SLOTS):
             costs = [
-                (
-                    int(row[f"Item[{trade}].ItemCost[{i}]"]),
-                    int(row[f"Item[{trade}].CurrencyCost[{i}]"]),
+                (None if indexes and item < CURRENCY_INDEXES else item, amount)
+                for item, amount in _slots(
+                    row,
+                    f"Item[{trade}].ItemCost",
+                    f"Item[{trade}].CurrencyCost",
+                    COST_SLOTS,
                 )
-                for i in range(COST_SLOTS)
             ]
-            for i in range(RECEIVE_SLOTS):
-                item = int(row[f"Item[{trade}].Item[{i}]"])
-                if item == 0:
-                    continue
-                db.executemany(
-                    "INSERT INTO source VALUES (?, 'special_shop', ?, ?, ?)",
-                    (
-                        (item, int(row["#"]), cost_item, cost_amount)
-                        for cost_item, cost_amount in costs
-                        if cost_item != 0
-                    ),
-                )
+            for item, amount in _slots(
+                row, f"Item[{trade}].Item", f"Item[{trade}].ReceiveCount", RECEIVE_SLOTS
+            ):
+                yield teamcraft.Trade(item, SPECIAL_SHOP, int(row["#"]), amount, costs)
 
 
 def _leves(db: sqlite3.Connection, sheets: Path) -> None:
@@ -263,3 +286,21 @@ def _slots(
         pair = int(row[f"{item}[{i}]"]), int(row[f"{amount}[{i}]"])
         if all(pair):
             yield pair
+
+
+def _add_source(
+    db: sqlite3.Connection,
+    item: int,
+    kind: str,
+    ref: int | None,
+    amount: int | None = None,
+    costs: list[tuple[int | None, int]] | None = None,
+) -> None:
+    source = db.execute(
+        "INSERT INTO source (item_id, kind, ref, amount) VALUES (?, ?, ?, ?)",
+        (item, kind, ref, amount),
+    ).lastrowid
+    db.executemany(
+        "INSERT INTO cost VALUES (?, ?, ?)",
+        ((source, cost_item, cost_amount) for cost_item, cost_amount in costs or []),
+    )
