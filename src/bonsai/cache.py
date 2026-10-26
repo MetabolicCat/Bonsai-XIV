@@ -45,7 +45,9 @@ class Cache:
             shutil.rmtree(partial)
             raise
         superseded = self.version(source)
-        partial.rename(self.directory(source, version))
+        target = self.directory(source, version)
+        shutil.rmtree(target, ignore_errors=True)
+        partial.rename(target)
         self._set_version(source, version)
         if superseded is not None and superseded != version:
             shutil.rmtree(self.directory(source, superseded))

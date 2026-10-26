@@ -56,3 +56,12 @@ def test_a_failed_download_keeps_the_current_version(
 
     assert cache.version("teamcraft") == old
     assert not [path for path in cache.root.rglob("*") if "e" * 40 in str(path)]
+
+
+def test_downloading_the_current_version_again_replaces_it(cache: Cache) -> None:
+    for content in ("first", "second"):
+        with cache.download("universalis", "20261026T173553Z") as directory:
+            (directory / "market.json").write_text(content)
+
+    current = cache.directory("universalis", "20261026T173553Z")
+    assert (current / "market.json").read_text() == "second"
