@@ -12,9 +12,9 @@ The problem statement and the intended pruning rules are described in
 
 ## Status
 
-Milestone 1, in progress: build the recipe tree from its sources,
-refresh it, and cache it locally. Pruning rules and the UI to
-experiment with them come in milestone 2.
+Milestone 1, done: build the recipe tree from its sources, refresh it,
+and cache it locally. Milestone 2, in progress: pruning rules, and a UI
+to experiment with them.
 
 ## Install
 
@@ -33,6 +33,7 @@ uv run bonsai refresh game      # fetch the latest game data, then build
 uv run bonsai refresh market    # fetch market prices, then build
 uv run bonsai build             # rebuild the tree from the cache, offline
 uv run bonsai status            # show what the cache holds and how old it is
+uv run bonsai prune             # keep what rules.toml selects; --show kept|hoard
 ```
 
 `refresh game` downloads the game data only when its sources have
@@ -47,6 +48,11 @@ Everything goes in the cache directory, `$XDG_CACHE_HOME/bonsai-xiv`
 - `sources/` holds the downloaded files, verbatim, under the version
   they were fetched at;
 - `bonsai.sqlite` is the tree built from them.
+
+`prune` runs the rules of `rules.toml`, or of the file given with
+`--rules`, over the tree: see [docs/pruning.md](docs/pruning.md) for how
+rules are written. `--show hoard` lists the base ingredients worth
+hoarding.
 
 `build` reads only the cache and the overrides, so the same cache
 always builds the same tree.

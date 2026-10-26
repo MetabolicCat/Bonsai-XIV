@@ -50,6 +50,8 @@ The **preferred recipe** of an item is its lowest-level one, the lowest
 id among those. Primitives that look at what a recipe needs, such as
 `craft_cost` and `farmed_leaves`, follow preferred recipes the same
 way.
+Quantities are averaged over many crafts: 3 rivets from a recipe making
+2 are 1.5 crafts of it.
 
 ## Results
 

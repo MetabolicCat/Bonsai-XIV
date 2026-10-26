@@ -3,7 +3,8 @@
 What it is for: [bonsai-xiv.md](bonsai-xiv.md). Where the data comes
 from: [docs/sources.md](docs/sources.md). What the built tree holds:
 [docs/tree.md](docs/tree.md); hand corrections to the sources:
-[docs/overrides.md](docs/overrides.md). Keep the docs in step with the
+[docs/overrides.md](docs/overrides.md); rules, primitives and pruning:
+[docs/pruning.md](docs/pruning.md). Keep the docs in step with the
 code.
 
 ## Commands
