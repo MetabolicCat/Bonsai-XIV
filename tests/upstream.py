@@ -60,7 +60,8 @@ class Upstream:
     """Serves sheets, Teamcraft extracts and market data at a commit.
 
     Sheets not set are served with a header and no rows. `requests`
-    records every path served, to check what was fetched.
+    records every path served, to check what was fetched. While
+    `failing` is set, Teamcraft's extracts fail to download.
     """
 
     def __init__(self) -> None:
@@ -70,6 +71,7 @@ class Upstream:
         self.extracts: dict[str, Any] = {}
         self.market: dict[int, Row] = {}
         self.requests: list[str] = []
+        self.failing = False
 
     def client(self) -> httpx.Client:
         return httpx.Client(transport=httpx.MockTransport(self._handle))
@@ -103,6 +105,8 @@ class Upstream:
             rows = self.sheets.get(sheet, [])
             return httpx.Response(200, text=_csv(DEFAULTS.get(sheet, {}), rows))
         if path == f"{TEAMCRAFT_RAW}/{self.teamcraft_commit}/{TEAMCRAFT_EXTRACTS}":
+            if self.failing:
+                return httpx.Response(500)
             return httpx.Response(200, text=json.dumps(self.extracts))
         return httpx.Response(404)
 

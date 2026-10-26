@@ -201,3 +201,28 @@ def test_crafting_leves_record_their_turn_ins(upstream: Upstream, cache: Cache) 
     db = built(upstream, cache)
 
     assert db.execute("SELECT * FROM leve").fetchall() == [(36, 5, 1823, 3)]
+
+
+def test_monster_drops_and_duty_loot_come_from_teamcraft(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.extracts = {
+        "5551": {
+            "id": 5551,
+            "sources": [
+                {"type": 3, "data": [{"npcId": 1000217, "price": 63}]},
+                {"type": 10, "data": [{"id": 38}, {"id": 112}]},
+            ],
+        },
+        "20001": {"id": 20001, "sources": [{"type": 6, "data": [9, 52]}]},
+        "2": {"id": 2},
+    }
+
+    db = built(upstream, cache)
+
+    assert sources(db) == [
+        (5551, "drop", 38, None, None),
+        (5551, "drop", 112, None, None),
+        (20001, "instance", 9, None, None),
+        (20001, "instance", 52, None, None),
+    ]

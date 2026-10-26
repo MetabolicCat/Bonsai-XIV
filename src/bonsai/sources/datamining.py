@@ -32,7 +32,6 @@ def head(client: httpx.Client) -> str:
 
 def fetch(client: httpx.Client, commit: str, directory: Path) -> None:
     """Download every sheet Bonsai uses, at `commit`, into `directory`."""
-    directory.mkdir(parents=True, exist_ok=True)
     for sheet in SHEETS:
         content = github.raw_file(client, REPOSITORY, commit, f"csv/en/{sheet}.csv")
         (directory / f"{sheet}.csv").write_bytes(content)

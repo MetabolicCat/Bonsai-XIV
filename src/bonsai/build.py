@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from bonsai.cache import Cache
-from bonsai.sources import datamining
+from bonsai.sources import datamining, teamcraft
 
 SCHEMA = """
 CREATE TABLE item (
@@ -71,10 +71,8 @@ GIL = 1
 
 def build(cache: Cache) -> None:
     """Write the tree to `cache.database`, from the cache only."""
-    version = cache.version(datamining.NAME)
-    if version is None:
-        raise RuntimeError("no game data in the cache: run `bonsai refresh game`")
-    sheets = cache.directory(datamining.NAME, version)
+    sheets = _current(cache, datamining.NAME)
+    extracts = _current(cache, teamcraft.NAME)
 
     cache.database.unlink(missing_ok=True)
     with sqlite3.connect(cache.database) as db:
@@ -85,7 +83,18 @@ def build(cache: Cache) -> None:
         _gil_shops(db, sheets)
         _special_shops(db, sheets)
         _leves(db, sheets)
+        db.executemany(
+            "INSERT INTO source VALUES (?, ?, ?, NULL, NULL)",
+            teamcraft.sources(extracts),
+        )
     db.close()
+
+
+def _current(cache: Cache, source: str) -> Path:
+    version = cache.version(source)
+    if version is None:
+        raise RuntimeError(f"no {source} data in the cache: run `bonsai refresh game`")
+    return cache.directory(source, version)
 
 
 def _items(db: sqlite3.Connection, sheets: Path) -> None:
