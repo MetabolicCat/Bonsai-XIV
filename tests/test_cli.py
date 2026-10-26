@@ -3,8 +3,10 @@ from pathlib import Path
 
 import pytest
 from upstream import Upstream
+from world import World
 
 from bonsai.__main__ import main
+from bonsai.cache import Cache
 
 
 @pytest.fixture(autouse=True)
@@ -126,3 +128,72 @@ def test_a_mistake_in_an_override_fails_with_its_file(
     assert run(upstream, tmp_path / "cache", "refresh", "game") == 1
 
     assert "overrides.toml: unknown item 1" in capsys.readouterr().err
+
+
+@pytest.fixture
+def world(tmp_path: Path, upstream: Upstream) -> World:
+    world = World(upstream, Cache(tmp_path / "cache"))
+    ore, shard = world.item(1, "Iron Ore"), world.crystal(2)
+    world.gathered(ore)
+    ingot = world.item(10, "Iron Ingot")
+    world.recipe(100, ingot, {ore: 3, shard: 1})
+    sword = world.item(20, "Iron Sword")
+    world.recipe(200, sword, {ingot: 2}, job="Smithing", level=20)
+    world.market(sword, 1000, 1000.0, 5.0)
+    world.recipe(300, world.item(30, "Iron Lance"), {ingot: 3})
+    world.tree()
+    return world
+
+
+RULES = '[[rule]]\nname = "Gil-maker"\nwhere = "turnover > 0"\n'
+
+
+def test_prune_summarises_what_the_rules_keep(
+    tmp_path: Path,
+    home: Path,
+    world: World,
+    upstream: Upstream,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    (home / "rules.toml").write_text(RULES)
+
+    assert run(upstream, tmp_path / "cache", "prune") == 0
+
+    assert capsys.readouterr().out == (
+        "Gil-maker  1 selected\n"
+        "kept 2 recipes of 3, pruned 1; 2 base ingredients to hoard\n"
+    )
+
+
+def test_prune_shows_the_hoard_and_the_kept_recipes(
+    tmp_path: Path,
+    home: Path,
+    world: World,
+    upstream: Upstream,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rules = tmp_path / "mine.toml"
+    rules.write_text(RULES)
+    cache = tmp_path / "cache"
+
+    assert run(upstream, cache, "prune", "--rules", str(rules), "--show", "hoard") == 0
+    hoard = capsys.readouterr().out.splitlines()[2:]
+    assert run(upstream, cache, "prune", "--rules", str(rules), "--show", "kept") == 0
+    kept = capsys.readouterr().out.splitlines()[2:]
+
+    assert hoard == [
+        "Iron Ore  needed by 1  gathering",
+        "Item 2    needed by 1  no known source",
+    ]
+    assert kept == [
+        "Iron Sword  Smithing 20  Gil-maker #1",
+        "Iron Ingot  Smithing 1   for Iron Sword",
+    ]
+
+
+def test_prune_without_rules_fails_with_a_hint(
+    tmp_path: Path, home: Path, upstream: Upstream, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert run(upstream, tmp_path / "cache", "prune") == 1
+
+    assert "rules.toml" in capsys.readouterr().err
