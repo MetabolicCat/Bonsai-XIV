@@ -72,12 +72,15 @@ def test_a_recipe_describes_itself_and_its_item(world: World) -> None:
 
 
 def test_parameters_set_level_bands_and_caps(world: World) -> None:
-    item = world.item(10, equip=95)
+    item = world.item(10)
     world.recipe(100, item, {}, level=63)
+    above = world.item(11)
+    world.recipe(101, above, {}, level=95)
 
-    values = primitives(world, 100, level_band=5, level_caps=[90])
+    values = primitives(world, 100, band_size=5, level_caps=[90])
 
-    assert (values["level_band"], values["level_cap"]) == (61, None)
+    assert (values["level_band"], values["level_cap"]) == (61, 90)
+    assert primitives(world, 101, level_caps=[90])["level_cap"] is None
 
 
 def test_leves_are_a_sink(world: World) -> None:
@@ -215,3 +218,11 @@ def test_every_primitive_is_documented_and_known(world: World) -> None:
     tree = world.tree()
 
     assert set(Primitives(tree, {}).of(tree.recipes[100])) == set(Primitives.NAMES)
+
+
+def test_the_level_cap_of_a_consumable_is_the_one_of_its_recipe(world: World) -> None:
+    """Meals and potions can be used from level 1: their recipe tells their tier."""
+    draught = world.item(10, category="Medicine", equip=1)
+    world.recipe(100, draught, {}, job="Alchemy", level=90)
+
+    assert primitives(world, 100)["level_cap"] == 90

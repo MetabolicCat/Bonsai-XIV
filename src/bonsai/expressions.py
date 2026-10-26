@@ -65,7 +65,8 @@ class Expression:
     def __init__(self, source: str) -> None:
         self.source = source
         try:
-            tree = ast.parse(source.strip(), mode="eval")
+            # Within parentheses, an expression can span lines.
+            tree = ast.parse(f"(\n{source}\n)", mode="eval")
         except SyntaxError as error:
             raise ValueError(f"bad expression {source!r}: {error.msg}") from error
         self.names: set[str] = set()

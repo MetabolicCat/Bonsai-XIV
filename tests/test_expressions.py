@@ -97,3 +97,7 @@ def test_an_unknown_name_is_an_error_when_evaluated() -> None:
 
 def test_math_domain_is_not_an_error() -> None:
     assert Expression("log(x)")({"x": math.e}) == pytest.approx(1)
+
+
+def test_an_expression_can_span_lines() -> None:
+    assert Expression("\n    (1 + 2)\n    * 3\n")({}) == 9

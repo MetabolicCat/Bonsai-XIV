@@ -84,14 +84,14 @@ any value the rules want to name:
 ```toml
 [parameters]
 price_cap = 3        # see price
-level_band = 10      # see level_band
+band_size = 10       # see level_band
 min_velocity = 1     # a name the rules use
 ```
 
 | Parameter | Default | Used by |
 |---|---|---|
 | `price_cap` | 3 | `price` |
-| `level_band` | 10 | `level_band` |
+| `band_size` | 10 | `level_band` |
 | `level_caps` | `[50, 60, 70, 80, 90, 100]` | `level_cap` |
 
 ## Primitives
@@ -105,7 +105,7 @@ All primitives describe one recipe; most describe the item it makes.
 | `recipe_id`, `item_id`, `name` | ids, and the name of the item made |
 | `job` | crafting job: `Woodworking`, `Cooking`, … |
 | `level`, `stars` | job level and difficulty stars |
-| `level_band` | first level of the recipe's band of `level_band` levels: 1, 11, 21, … |
+| `level_band` | first level of the recipe's band of `band_size` levels: 1, 11, 21, … |
 | `expert`, `master_book` | expert recipe; needs a master recipe book |
 | `amount` | items one craft makes |
 | `burden` | ingredient units per craft, crystals excluded |
@@ -120,7 +120,7 @@ All primitives describe one recipe; most describe the item it makes.
 | `can_be_hq`, `marketable`, `untradable` | from the item |
 | `ui_category` | `Meal`, `Medicine`, `Lumber`, … |
 | `item_level`, `equip_level` | item level; level to use or equip it |
-| `level_cap` | the lowest of `level_caps` at or above `equip_level` |
+| `level_cap` | the lowest of `level_caps` at or above the recipe level: the tier of content it is made for |
 | `leve`, `leve_level` | it is turned in for a crafting leve; the lowest such leve's level |
 
 ### Market

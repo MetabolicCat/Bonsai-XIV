@@ -8,7 +8,7 @@ from bonsai.tree import Market, Recipe, Tree
 
 DEFAULT_PARAMETERS: dict[str, Any] = {
     "price_cap": 3,
-    "level_band": 10,
+    "band_size": 10,
     "level_caps": [50, 60, 70, 80, 90, 100],
 }
 
@@ -74,7 +74,7 @@ class Primitives:
             for ingredient, amount in recipe.ingredients.items()
             if not tree.items[ingredient].crystal
         }
-        band = parameters["level_band"]
+        band = parameters["band_size"]
         leves = tree.leves.get(item.id, [])
         market = tree.market.get((item.id, item.can_be_hq))
         price = _price(market, parameters["price_cap"])
@@ -111,7 +111,7 @@ class Primitives:
             "item_level": item.item_level,
             "equip_level": item.equip_level,
             "level_cap": next(
-                (cap for cap in parameters["level_caps"] if cap >= item.equip_level),
+                (cap for cap in parameters["level_caps"] if cap >= recipe.level),
                 None,
             ),
             "leve": bool(leves),

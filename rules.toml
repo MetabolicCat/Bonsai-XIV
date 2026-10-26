@@ -1,0 +1,60 @@
+# What is worth crafting, and so hoarding: the criteria of bonsai-xiv.md
+# as rules. See docs/pruning.md for how rules work and what they can use.
+#
+# Criterion 3 (precursors) needs no rule: a kept recipe keeps the
+# sub-crafts it needs. Criterion 1 (log completion) waits for the
+# crafting log of a character.
+
+[parameters]
+# Market prices above this many times the lowest listing are capped:
+# thinly traded items are sold at absurd prices to move gil around.
+price_cap = 3
+# Recipes compete within bands of this many levels.
+band_size = 10
+# Sold at least this many a day: a market that absorbs the crafts.
+min_velocity = 1
+
+
+# 2. Direct gil-makers: what the market absorbs the most gil of, among
+# the recipes that sell regularly at a profit.
+[[rule]]
+name = "Gil-maker"
+where = "velocity >= min_velocity and coalesce(profit, price) > 0"
+group = "job"
+score = "turnover"
+keep = 10
+
+
+# 4. Craft count: in each job and level band, the recipe most practical
+# to make by the thousand. It must have a sink, the market or a leve;
+# few ingredients, no farmed ones, and a stacking output weigh in.
+[[rule]]
+name = "Craft count"
+where = "velocity >= min_velocity or leve"
+group = ["job", "level_band"]
+score = """
+    (coalesce(turnover, 0) + (1000 if leve else 0))
+    / max(burden, 1)
+    / (1 + farmed_leaves + unsourced_leaves)
+    * (1 if stackable else 0.2)
+"""
+keep = 1
+
+
+# 5. Crafting leves: in each job and leve level, the cheapest turn-in.
+[[rule]]
+name = "Leves"
+where = "leve"
+group = ["job", "leve_level"]
+score = "-coalesce(craft_cost, 1000000) - 100000 * (farmed_leaves + unsourced_leaves)"
+keep = 1
+
+
+# 6. Consumables for level-capped content: at each level cap, the meals
+# and medicines the market absorbs the most gil of.
+[[rule]]
+name = "Consumables"
+where = "ui_category in ['Meal', 'Medicine'] and level_cap != none"
+group = ["ui_category", "level_cap"]
+score = "coalesce(turnover, 0)"
+keep = 3
