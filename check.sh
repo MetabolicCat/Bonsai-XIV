@@ -5,7 +5,7 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-for step in lock-check lint typecheck shellcheck test; do
+for step in lock-check lint typecheck shellcheck ui-check test; do
     echo "=== ${step} ==="
     make -C "$repo_root" --no-print-directory "$step"
 done

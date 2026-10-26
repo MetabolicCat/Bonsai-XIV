@@ -52,7 +52,8 @@ Everything goes in the cache directory, `$XDG_CACHE_HOME/bonsai-xiv`
 `prune` runs the rules of `rules.toml`, or of the file given with
 `--rules`, over the tree: see [docs/pruning.md](docs/pruning.md) for how
 rules are written. `--show hoard` lists the base ingredients worth
-hoarding.
+hoarding. To experiment with rules, `make ui` opens a page where they
+apply as you edit them: see [docs/ui.md](docs/ui.md).
 
 `build` reads only the cache and the overrides, so the same cache
 always builds the same tree.

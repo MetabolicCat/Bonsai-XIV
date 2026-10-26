@@ -4,8 +4,8 @@ What it is for: [bonsai-xiv.md](bonsai-xiv.md). Where the data comes
 from: [docs/sources.md](docs/sources.md). What the built tree holds:
 [docs/tree.md](docs/tree.md); hand corrections to the sources:
 [docs/overrides.md](docs/overrides.md); rules, primitives and pruning:
-[docs/pruning.md](docs/pruning.md). Keep the docs in step with the
-code.
+[docs/pruning.md](docs/pruning.md); the UI: [docs/ui.md](docs/ui.md).
+Keep the docs in step with the code.
 
 ## Commands
 
@@ -20,6 +20,9 @@ code.
   offline): the build reads only the cache, so the same cache gives the
   same tree.
 - One module per source under `src/bonsai/sources/`.
+- The UI (`ui/pruning.py`, marimo) only wires widgets: what it shows
+  comes from `bonsai.report`, which is tested; check.sh runs
+  `marimo check` on the notebook.
 - The real data has surprises (unnamed items, currency indexes, gaps):
   check a change against it, not only against the tests.
 

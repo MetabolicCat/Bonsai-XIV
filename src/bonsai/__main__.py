@@ -1,7 +1,6 @@
 """The `bonsai` command line."""
 
 import argparse
-import os
 import sqlite3
 import sys
 from contextlib import nullcontext
@@ -10,7 +9,7 @@ from pathlib import Path
 
 import httpx
 
-from bonsai import overrides, report
+from bonsai import overrides, paths, report
 from bonsai.build import build
 from bonsai.cache import Cache
 from bonsai.pruning import prune
@@ -59,7 +58,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--cache-dir",
         type=Path,
-        default=_default_cache_dir(),
+        default=paths.cache_dir(),
         help="where the sources and the tree are kept (default: %(default)s)",
     )
     commands = parser.add_subparsers(dest="command", required=True)
@@ -87,22 +86,13 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _default_cache_dir() -> Path:
-    return _xdg("XDG_CACHE_HOME", ".cache") / "bonsai-xiv"
-
-
 def _override_files() -> list[Path]:
     """The shared overrides, then the personal ones: those that exist."""
     files = [
         Path("overrides.toml"),
-        _xdg("XDG_CONFIG_HOME", ".config") / "bonsai-xiv" / "overrides.toml",
+        paths.config_dir() / "overrides.toml",
     ]
     return [path for path in files if path.exists()]
-
-
-def _xdg(variable: str, default: str) -> Path:
-    directory = os.environ.get(variable)
-    return Path(directory) if directory else Path.home() / default
 
 
 def _client() -> httpx.Client:
