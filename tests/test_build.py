@@ -131,3 +131,73 @@ def test_recipe_level_and_master_book(upstream: Upstream, cache: Cache) -> None:
     assert db.execute("SELECT * FROM recipe").fetchall() == [
         (35000, 44000, 3, "Cooking", 100, 2, True, True)
     ]
+
+
+def sources(db: sqlite3.Connection) -> list[tuple[object, ...]]:
+    return db.execute(
+        "SELECT * FROM source ORDER BY item_id, kind, ref, cost_item_id"
+    ).fetchall()
+
+
+def test_gathered_and_fished_items_have_a_source(
+    upstream: Upstream, cache: Cache
+) -> None:
+    upstream.sheets["GatheringItem"] = [{"#": 0, "Item": 0}, {"#": 30, "Item": 5111}]
+    upstream.sheets["FishParameter"] = [{"#": 1, "Item": 4776}]
+    upstream.sheets["SpearfishingItem"] = [{"#": 20000, "Item": 7684}]
+
+    db = built(upstream, cache)
+
+    assert sources(db) == [
+        (4776, "fishing", 1, None, None),
+        (5111, "gathering", 30, None, None),
+        (7684, "fishing", 20000, None, None),
+    ]
+
+
+def test_shops_record_what_an_item_costs(upstream: Upstream, cache: Cache) -> None:
+    upstream.sheets["Item"] = [
+        {"#": 5111, "Name": "Iron Ore", "PriceMid": 18},
+        {"#": 28, "Name": "Allagan Tomestone of Poetics"},
+    ]
+    upstream.sheets["GilShopItem"] = [
+        {"#": "262144.0", "Item": 5111},
+        {"#": "262145.3", "Item": 5111},
+    ]
+    upstream.sheets["SpecialShop"] = [
+        {
+            "#": 1769485,
+            "Item[0].Item[0]": 6968,
+            "Item[0].ReceiveCount[0]": 1,
+            "Item[0].ItemCost[0]": 7000,
+            "Item[0].CurrencyCost[0]": 10,
+            "Item[0].ItemCost[1]": 28,
+            "Item[0].CurrencyCost[1]": 5,
+            "Item[1].Item[0]": 6969,
+            "Item[1].ReceiveCount[0]": 1,
+            "Item[1].ItemCost[0]": 7000,
+            "Item[1].CurrencyCost[0]": 20,
+        },
+    ]
+
+    db = built(upstream, cache)
+
+    assert sources(db) == [
+        (5111, "gil_shop", 262144, 1, 18),
+        (5111, "gil_shop", 262145, 1, 18),
+        (6968, "special_shop", 1769485, 28, 5),
+        (6968, "special_shop", 1769485, 7000, 10),
+        (6969, "special_shop", 1769485, 7000, 20),
+    ]
+
+
+def test_crafting_leves_record_their_turn_ins(upstream: Upstream, cache: Cache) -> None:
+    upstream.sheets["Leve"] = [{"#": 36, "ClassJobLevel": 5}]
+    upstream.sheets["CraftLeve"] = [
+        {"#": 0, "Leve": 0},
+        {"#": 917505, "Leve": 36, "Item[0]": 1823, "ItemCount[0]": 3},
+    ]
+
+    db = built(upstream, cache)
+
+    assert db.execute("SELECT * FROM leve").fetchall() == [(36, 5, 1823, 3)]

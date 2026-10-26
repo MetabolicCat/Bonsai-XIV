@@ -10,7 +10,20 @@ from bonsai.sources import github
 
 NAME = "datamining"
 REPOSITORY = "xivapi/ffxiv-datamining"
-SHEETS = ["CraftType", "Item", "ItemUICategory", "Recipe", "RecipeLevelTable"]
+SHEETS = [
+    "CraftLeve",
+    "CraftType",
+    "FishParameter",
+    "GatheringItem",
+    "GilShopItem",
+    "Item",
+    "ItemUICategory",
+    "Leve",
+    "Recipe",
+    "RecipeLevelTable",
+    "SpearfishingItem",
+    "SpecialShop",
+]
 
 
 def head(client: httpx.Client) -> str:

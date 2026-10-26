@@ -1,6 +1,7 @@
 """Building the tree from the cached sources: see docs/tree.md."""
 
 import sqlite3
+from collections.abc import Iterator
 from pathlib import Path
 
 from bonsai.cache import Cache
@@ -36,10 +37,36 @@ CREATE TABLE ingredient (
     PRIMARY KEY (recipe_id, item_id)
 );
 CREATE INDEX ingredient_item ON ingredient (item_id);
+CREATE TABLE source (
+    item_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,
+    ref INTEGER NOT NULL,
+    cost_item_id INTEGER,
+    cost_amount INTEGER
+);
+CREATE INDEX source_item ON source (item_id);
+CREATE TABLE leve (
+    id INTEGER NOT NULL,
+    level INTEGER NOT NULL,
+    item_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL
+);
+CREATE INDEX leve_item ON leve (item_id);
 """
 
 # A recipe has up to this many ingredients, crystals included.
 INGREDIENT_SLOTS = 8
+
+# A special shop has up to this many trades, each giving up to
+# RECEIVE_SLOTS items for up to COST_SLOTS costs.
+TRADE_SLOTS = 60
+RECEIVE_SLOTS = 2
+COST_SLOTS = 3
+
+# A crafting leve asks for up to this many different items.
+TURN_IN_SLOTS = 4
+
+GIL = 1
 
 
 def build(cache: Cache) -> None:
@@ -54,6 +81,10 @@ def build(cache: Cache) -> None:
         db.executescript(SCHEMA)
         _items(db, sheets)
         _recipes(db, sheets)
+        _sources(db, sheets)
+        _gil_shops(db, sheets)
+        _special_shops(db, sheets)
+        _leves(db, sheets)
     db.close()
 
 
@@ -110,11 +141,89 @@ def _recipes(db: sqlite3.Connection, sheets: Path) -> None:
         db.executemany(
             "INSERT INTO ingredient VALUES (?, ?, ?)",
             (
-                (recipe_id, int(item), int(amount))
-                for item, amount in (
-                    (row[f"Ingredient[{i}]"], row[f"AmountIngredient[{i}]"])
-                    for i in range(INGREDIENT_SLOTS)
+                (recipe_id, item, amount)
+                for item, amount in _slots(
+                    row, "Ingredient", "AmountIngredient", INGREDIENT_SLOTS
                 )
-                if item != "0" and amount != "0"
             ),
         )
+
+
+def _sources(db: sqlite3.Connection, sheets: Path) -> None:
+    for kind, sheet in [
+        ("gathering", "GatheringItem"),
+        ("fishing", "FishParameter"),
+        ("fishing", "SpearfishingItem"),
+    ]:
+        db.executemany(
+            "INSERT INTO source VALUES (?, ?, ?, NULL, NULL)",
+            (
+                (int(row["Item"]), kind, int(row["#"]))
+                for row in datamining.rows(sheets, sheet)
+                if row["Item"] != "0"
+            ),
+        )
+
+
+def _gil_shops(db: sqlite3.Connection, sheets: Path) -> None:
+    prices = {row["#"]: int(row["PriceMid"]) for row in datamining.rows(sheets, "Item")}
+    # A row is a subrow of its shop: "<shop>.<index>".
+    sold = {
+        (row["Item"], row["#"].split(".")[0])
+        for row in datamining.rows(sheets, "GilShopItem")
+        if row["Item"] != "0"
+    }
+    db.executemany(
+        "INSERT INTO source VALUES (?, 'gil_shop', ?, ?, ?)",
+        ((int(item), int(shop), GIL, prices[item]) for item, shop in sorted(sold)),
+    )
+
+
+def _special_shops(db: sqlite3.Connection, sheets: Path) -> None:
+    for row in datamining.rows(sheets, "SpecialShop"):
+        for trade in range(TRADE_SLOTS):
+            costs = [
+                (
+                    int(row[f"Item[{trade}].ItemCost[{i}]"]),
+                    int(row[f"Item[{trade}].CurrencyCost[{i}]"]),
+                )
+                for i in range(COST_SLOTS)
+            ]
+            for i in range(RECEIVE_SLOTS):
+                item = int(row[f"Item[{trade}].Item[{i}]"])
+                if item == 0:
+                    continue
+                db.executemany(
+                    "INSERT INTO source VALUES (?, 'special_shop', ?, ?, ?)",
+                    (
+                        (item, int(row["#"]), cost_item, cost_amount)
+                        for cost_item, cost_amount in costs
+                        if cost_item != 0
+                    ),
+                )
+
+
+def _leves(db: sqlite3.Connection, sheets: Path) -> None:
+    levels = {
+        row["#"]: int(row["ClassJobLevel"]) for row in datamining.rows(sheets, "Leve")
+    }
+    for row in datamining.rows(sheets, "CraftLeve"):
+        if row["Leve"] == "0":
+            continue
+        db.executemany(
+            "INSERT INTO leve VALUES (?, ?, ?, ?)",
+            (
+                (int(row["Leve"]), levels[row["Leve"]], item, amount)
+                for item, amount in _slots(row, "Item", "ItemCount", TURN_IN_SLOTS)
+            ),
+        )
+
+
+def _slots(
+    row: dict[str, str], item: str, amount: str, count: int
+) -> Iterator[tuple[int, int]]:
+    """The (item, amount) pairs of a row's `count` slots that are filled."""
+    for i in range(count):
+        pair = int(row[f"{item}[{i}]"]), int(row[f"{amount}[{i}]"])
+        if all(pair):
+            yield pair

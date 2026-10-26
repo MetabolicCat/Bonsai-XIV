@@ -25,6 +25,23 @@ DEFAULTS: dict[str, Row] = {
         "ItemUICategory": 0,
         "LevelItem": 1,
         "LevelEquip": 1,
+        "PriceMid": 0,
+    },
+    "SpecialShop": {
+        f"Item[{trade}].{column}[{i}]": 0
+        for trade in range(60)
+        for column, slots in [
+            ("Item", 2),
+            ("ReceiveCount", 2),
+            ("ItemCost", 3),
+            ("CurrencyCost", 3),
+        ]
+        for i in range(slots)
+    },
+    "CraftLeve": {
+        "Leve": 0,
+        **{f"Item[{i}]": 0 for i in range(4)},
+        **{f"ItemCount[{i}]": 0 for i in range(4)},
     },
     "Recipe": {
         "CraftType": 0,
