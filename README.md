@@ -26,6 +26,38 @@ cd Bonsai-XIV
 make install
 ```
 
+## Usage
+
+```sh
+uv run bonsai refresh game      # fetch the latest game data, then build
+uv run bonsai refresh market    # fetch market prices, then build
+uv run bonsai build             # rebuild the tree from the cache, offline
+uv run bonsai status            # show what the cache holds and how old it is
+```
+
+`refresh game` downloads the game data only when its sources have
+moved since the last fetch. `refresh market` fetches prices for every
+marketable item in the tree from the `Japan` region by default; use
+`--scope` for another Universalis region, data center or world.
+
+Everything goes in the cache directory, `$XDG_CACHE_HOME/bonsai-xiv`
+(`~/.cache/bonsai-xiv` by default), or the one given with
+`--cache-dir`:
+
+- `sources/` holds the downloaded files, verbatim, under the version
+  they were fetched at;
+- `bonsai.sqlite` is the tree built from them.
+
+`build` reads only the cache and the overrides, so the same cache
+always builds the same tree.
+
+Sources that are wrong or missing can be corrected by hand in
+`overrides.toml`, shared in the repository, or in
+`~/.config/bonsai-xiv/overrides.toml` for personal corrections: see
+[docs/overrides.md](docs/overrides.md). See [docs/sources.md](docs/sources.md) for where the data comes
+from and how each source is updated, and
+[docs/tree.md](docs/tree.md) for the tables in `bonsai.sqlite`.
+
 ## Development
 
 ```sh
